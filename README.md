@@ -4,9 +4,7 @@ Interactive ER Diagram tool for CS4221 at NUS. Supports Chen and Crow's Foot not
 
 ## Features
 
-- **Chen notation** following CS4221 L02 conventions (circles for attributes, filled circles for keys, diamonds for relationships, cardinality as `(min, n)`)
-- **Crow's Foot notation** with table-style entity boxes, PK/FK markers, and crow's foot edge symbols
-- **Seamless notation switching** — toggle between Chen and Crow's Foot; the underlying model is preserved
+- **Multiple notation styles** with seamless switching — build your diagram once and toggle between notations instantly (e.g. Chen, Crow's Foot). The underlying model is notation-agnostic and extensible to additional styles
 - **Candidate key support** — multiple candidate keys per entity, set primary via radio button
 - **Partial key support** — branches off the identifying relationship participation line (per CS4221 convention)
 - **Weak entities** with identifying relationships and double-bordered rendering
