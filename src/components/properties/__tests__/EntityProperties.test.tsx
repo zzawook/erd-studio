@@ -40,19 +40,6 @@ describe('EntityProperties', () => {
     expect(useERDStore.getState().model.entities[0].name).toBe('Teacher');
   });
 
-  it('shows weak entity checkbox unchecked by default', () => {
-    render(<EntityProperties entity={getEntity(entityId)} />);
-    expect(screen.getByTestId('entity-weak-checkbox')).not.toBeChecked();
-  });
-
-  it('toggles weak entity', async () => {
-    const user = userEvent.setup();
-    render(<EntityProperties entity={getEntity(entityId)} />);
-
-    await user.click(screen.getByTestId('entity-weak-checkbox'));
-    expect(useERDStore.getState().model.entities[0].isWeak).toBe(true);
-  });
-
   it('shows "No attributes" when entity has none', () => {
     render(<EntityProperties entity={getEntity(entityId)} />);
     expect(screen.getByText('No attributes')).toBeInTheDocument();

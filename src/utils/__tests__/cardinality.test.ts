@@ -24,15 +24,15 @@ describe('isMany', () => {
 });
 
 describe('fkColumnName', () => {
-  it('generates correct format with lowercase entity name', () => {
-    expect(fkColumnName('Student', 'id')).toBe('student_id');
+  it('returns the attribute name as-is', () => {
+    expect(fkColumnName('Student', 'id')).toBe('id');
   });
 
-  it('generates correct format for multi-word entity', () => {
-    expect(fkColumnName('CourseSection', 'sectionId')).toBe('coursesection_sectionId');
+  it('ignores entity name', () => {
+    expect(fkColumnName('CourseSection', 'sectionId')).toBe('sectionId');
   });
 
   it('handles already-lowercase entity name', () => {
-    expect(fkColumnName('department', 'name')).toBe('department_name');
+    expect(fkColumnName('department', 'name')).toBe('name');
   });
 });

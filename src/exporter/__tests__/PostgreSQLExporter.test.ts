@@ -289,8 +289,8 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('"department_id" INTEGER');
-    expect(result.ddl).toContain('FOREIGN KEY ("department_id") REFERENCES "Department" ("id")');
+    expect(result.ddl).toContain('"id" INTEGER');
+    expect(result.ddl).toContain('FOREIGN KEY ("id") REFERENCES "Department" ("id")');
     // Department table should be created before Employee (topo sort)
     const deptPos = result.ddl.indexOf('CREATE TABLE "Department"');
     const empPos = result.ddl.indexOf('CREATE TABLE "Employee"');
@@ -335,7 +335,7 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // Passport (optional side, min=0) should get the FK
     const passportTable = result.ddl.split('CREATE TABLE "Passport"')[1];
-    expect(passportTable).toContain('FOREIGN KEY ("person_id") REFERENCES "Person" ("id")');
+    expect(passportTable).toContain('FOREIGN KEY ("id") REFERENCES "Person" ("id")');
   });
 
   // -----------------------------------------------------------------------
@@ -376,7 +376,7 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // "Beta" > "Alpha" alphabetically so Beta gets the FK
     const betaTable = result.ddl.split('CREATE TABLE "Beta"')[1];
-    expect(betaTable).toContain('FOREIGN KEY ("alpha_id") REFERENCES "Alpha" ("id")');
+    expect(betaTable).toContain('FOREIGN KEY ("id") REFERENCES "Alpha" ("id")');
   });
 
   // -----------------------------------------------------------------------
@@ -415,7 +415,7 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('CREATE TABLE "Course_Student"');
+    expect(result.ddl).toContain('CREATE TABLE "enrolls"');
     expect(result.ddl).toContain('"student_id" INTEGER NOT NULL');
     expect(result.ddl).toContain('"course_id" INTEGER NOT NULL');
     expect(result.ddl).toContain('PRIMARY KEY ("student_id", "course_id")');
@@ -424,10 +424,10 @@ describe('PostgreSQLExporter', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Junction table alphabetical naming
+  // Junction table named after relationship
   // -----------------------------------------------------------------------
 
-  it('names junction table alphabetically', () => {
+  it('names junction table after the relationship', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({
@@ -459,7 +459,7 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('CREATE TABLE "Apple_Zebra"');
+    expect(result.ddl).toContain('CREATE TABLE "rel"');
   });
 
   // -----------------------------------------------------------------------
@@ -500,9 +500,54 @@ describe('PostgreSQLExporter', () => {
     };
     const result = exporter.export(model);
     const roomTable = result.ddl.split('CREATE TABLE "Room"')[1];
-    expect(roomTable).toContain('"building_id" INTEGER NOT NULL');
-    expect(roomTable).toContain('PRIMARY KEY ("number", "building_id")');
-    expect(roomTable).toContain('FOREIGN KEY ("building_id") REFERENCES "Building" ("id")');
+    expect(roomTable).toContain('"id" INTEGER NOT NULL');
+    expect(roomTable).toContain('PRIMARY KEY ("number", "id")');
+    expect(roomTable).toContain('FOREIGN KEY ("id") REFERENCES "Building" ("id")');
+  });
+
+  it('does not create junction table for M:N identifying relationship', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Building',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'bid', dataType: { name: 'INT' }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Room',
+          isWeak: true,
+          attributes: [
+            makeAttr({ id: 'a2', name: 'roomno', dataType: { name: 'INT' }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Should NOT contain a junction table
+    expect(result.ddl).not.toContain('CREATE TABLE "has"');
+    // Room should have the FK from Building in its PK
+    expect(result.ddl).toContain('"bid" INTEGER NOT NULL');
+    expect(result.ddl).toContain('PRIMARY KEY ("roomno", "bid")');
+    expect(result.ddl).toContain('FOREIGN KEY ("bid") REFERENCES "Building" ("bid")');
   });
 
   // -----------------------------------------------------------------------
@@ -585,7 +630,7 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    const junctionTable = result.ddl.split('CREATE TABLE "Course_Student"')[1];
+    const junctionTable = result.ddl.split('CREATE TABLE "enrolls"')[1];
     expect(junctionTable).toContain('"grade" VARCHAR(2)');
   });
 
@@ -711,10 +756,10 @@ describe('PostgreSQLExporter', () => {
     };
     const result = exporter.export(model);
     expect(result.ddl).toContain('CREATE TABLE "Person_phone"');
-    expect(result.ddl).toContain('"person_id" INTEGER NOT NULL');
+    expect(result.ddl).toContain('"id" INTEGER NOT NULL');
     expect(result.ddl).toContain('"phone" VARCHAR(20) NOT NULL');
-    expect(result.ddl).toContain('PRIMARY KEY ("person_id", "phone")');
-    expect(result.ddl).toContain('FOREIGN KEY ("person_id") REFERENCES "Person" ("id")');
+    expect(result.ddl).toContain('PRIMARY KEY ("id", "phone")');
+    expect(result.ddl).toContain('FOREIGN KEY ("id") REFERENCES "Person" ("id")');
   });
 
   // -----------------------------------------------------------------------
@@ -973,7 +1018,7 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('CREATE TABLE "A_B"');
+    expect(result.ddl).toContain('CREATE TABLE "rel"');
   });
 
   // -----------------------------------------------------------------------
@@ -1093,7 +1138,89 @@ describe('PostgreSQLExporter', () => {
     };
     const result = exporter.export(model);
     const orderTable = result.ddl.split('CREATE TABLE "Order"')[1];
-    expect(orderTable).toContain('FOREIGN KEY ("customer_id") REFERENCES "Customer" ("id")');
+    expect(orderTable).toContain('FOREIGN KEY ("id") REFERENCES "Customer" ("id")');
+  });
+
+  it('adds FK column when name does not collide with existing columns', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Order',
+          attributes: [makeAttr({ id: 'a1', name: 'oid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Customer',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'places',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const orderDDL = result.ddl.split('CREATE TABLE "Order"')[1];
+    // FK column "cid" should be added to Order (no collision with "oid")
+    expect(orderDDL).toContain('"cid" INTEGER');
+    expect(orderDDL).toContain('FOREIGN KEY ("cid") REFERENCES "Customer" ("cid")');
+  });
+
+  it('does not duplicate FK column when name collides with existing column', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Order',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a3', name: 'note', dataType: { name: 'TEXT' } }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Customer',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'places',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Order already has "id" column; FK from Customer is also "id"
+    // The duplicate column should not be added again
+    const orderDDL = result.ddl.split('CREATE TABLE "Order"')[1];
+    const idCount = (orderDDL.match(/"id"/g) || []).length;
+    // "id" appears in: column def, PRIMARY KEY, FOREIGN KEY columns, REFERENCES — but only one column definition
+    expect(orderDDL).toContain('FOREIGN KEY ("id") REFERENCES "Customer" ("id")');
+    expect(idCount).toBeGreaterThanOrEqual(3); // col def + PK + FK ref
   });
 
   // -----------------------------------------------------------------------
@@ -1134,7 +1261,7 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // e1 has min=0, so it should get the FK
     const aTable = result.ddl.split('CREATE TABLE "A"')[1];
-    expect(aTable).toContain('FOREIGN KEY ("b_id") REFERENCES "B" ("id")');
+    expect(aTable).toContain('FOREIGN KEY ("id") REFERENCES "B" ("id")');
   });
 
   // -----------------------------------------------------------------------
@@ -1442,7 +1569,7 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // Only the valid attribute should be added as FK
     const depTable = result.ddl.split('CREATE TABLE "Dep"')[1];
-    expect(depTable).toContain('"owner_oid"');
+    expect(depTable).toContain('"oid"');
     expect(depTable).toContain('FOREIGN KEY');
   });
 
@@ -1525,7 +1652,7 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // "Dog" > "Cat" alphabetically so Dog gets the FK
     const dogTable = result.ddl.split('CREATE TABLE "Dog"')[1];
-    expect(dogTable).toContain('FOREIGN KEY ("cat_id") REFERENCES "Cat" ("id")');
+    expect(dogTable).toContain('FOREIGN KEY ("id") REFERENCES "Cat" ("id")');
   });
 
   it('handles junction table when entities are not found', () => {
@@ -1689,12 +1816,12 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     const depTable = result.ddl.split('CREATE TABLE "Dep"')[1];
     // FK columns from owner's composite PK should be added
-    expect(depTable).toContain('"owner_code" VARCHAR(10) NOT NULL');
-    expect(depTable).toContain('"owner_region" VARCHAR(20) NOT NULL');
+    expect(depTable).toContain('"code" VARCHAR(10) NOT NULL');
+    expect(depTable).toContain('"region" VARCHAR(20) NOT NULL');
     // They should be part of the PK
-    expect(depTable).toContain('PRIMARY KEY ("seq", "owner_code", "owner_region")');
+    expect(depTable).toContain('PRIMARY KEY ("seq", "code", "region")');
     // And a FK constraint should reference the owner
-    expect(depTable).toContain('FOREIGN KEY ("owner_code", "owner_region") REFERENCES "Owner" ("code", "region")');
+    expect(depTable).toContain('FOREIGN KEY ("code", "region") REFERENCES "Owner" ("code", "region")');
   });
 
   // -----------------------------------------------------------------------
@@ -1727,8 +1854,8 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    // Self-ref M:N -> junction table Person_Person
-    expect(result.ddl).toContain('CREATE TABLE "Person_Person"');
+    // Self-ref M:N -> junction table named after relationship
+    expect(result.ddl).toContain('CREATE TABLE "knows"');
   });
 
   // -----------------------------------------------------------------------

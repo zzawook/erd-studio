@@ -6,6 +6,6 @@ export function isMany(cardinality: Cardinality): boolean {
 }
 
 /** Generate a FK column name from the referenced entity and attribute names. */
-export function fkColumnName(entityName: string, attrName: string): string {
-  return `${entityName.toLowerCase()}_${attrName}`;
+export function fkColumnName(_entityName: string, attrName: string): string {
+  return attrName;
 }
