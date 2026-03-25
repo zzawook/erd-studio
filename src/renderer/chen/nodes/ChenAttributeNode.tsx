@@ -37,7 +37,7 @@ export function ChenAttributeNode({ data, selected }: NodeProps<ChenAttributeNod
       />
 
       {/* Name label outside the circle */}
-      <span className="text-xs text-gray-800 whitespace-nowrap">
+      <span className={`text-xs text-gray-800 whitespace-nowrap ${isPrimaryKey ? 'underline' : ''}`}>
         {attribute.name}
       </span>
     </div>
