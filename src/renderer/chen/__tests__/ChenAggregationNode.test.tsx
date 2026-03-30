@@ -67,6 +67,6 @@ describe('ChenAggregationNode', () => {
 
     const node = screen.getByTestId('chen-aggregation-node');
     expect(node.className).toContain('ring-2');
-    expect(node.className).toContain('ring-blue-500');
+    expect(node.className).toContain('ring-primary-500');
   });
 });

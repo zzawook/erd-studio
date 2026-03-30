@@ -249,23 +249,25 @@ describe('RelationshipProperties', () => {
 
   it('deletes relationship when confirmed', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<RelationshipProperties relationship={getRel(relId)} />);
+    // First click shows the confirm UI
+    await user.click(screen.getByTestId('delete-rel-button'));
+    // Second click on the confirm button actually deletes
     await user.click(screen.getByTestId('delete-rel-button'));
 
     expect(useERDStore.getState().model.relationships).toHaveLength(0);
-    vi.restoreAllMocks();
   });
 
   it('does not delete relationship when cancelled', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     render(<RelationshipProperties relationship={getRel(relId)} />);
+    // First click shows the confirm UI
     await user.click(screen.getByTestId('delete-rel-button'));
+    // Click Cancel instead of confirm
+    await user.click(screen.getByText('Cancel'));
 
     expect(useERDStore.getState().model.relationships).toHaveLength(1);
-    vi.restoreAllMocks();
   });
 });

@@ -47,31 +47,31 @@ describe('Toolbar', () => {
 
   it('clears model when clear button is clicked and confirmed', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     // Add an entity to the model first
     useERDStore.getState().addEntity('Test', { x: 0, y: 0 });
     expect(useERDStore.getState().model.entities).toHaveLength(1);
 
     render(<Toolbar />);
+    // First click shows the confirm UI
+    await user.click(screen.getByTestId('clear-button'));
+    // Second click on the confirm button actually clears
     await user.click(screen.getByTestId('clear-button'));
     expect(useERDStore.getState().model.entities).toHaveLength(0);
-
-    vi.restoreAllMocks();
   });
 
   it('does not clear model when clear is cancelled', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     useERDStore.getState().addEntity('Test', { x: 0, y: 0 });
     expect(useERDStore.getState().model.entities).toHaveLength(1);
 
     render(<Toolbar />);
+    // First click shows the confirm UI
     await user.click(screen.getByTestId('clear-button'));
+    // Click Cancel instead of confirm
+    await user.click(screen.getByText('Cancel'));
     expect(useERDStore.getState().model.entities).toHaveLength(1);
-
-    vi.restoreAllMocks();
   });
 
   it('closes export dialog when close button is clicked', async () => {

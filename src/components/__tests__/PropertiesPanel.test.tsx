@@ -20,7 +20,7 @@ describe('PropertiesPanel', () => {
 
   it('shows default message when nothing is selected', () => {
     render(<PropertiesPanel />);
-    expect(screen.getByText('Select an element to edit its properties')).toBeInTheDocument();
+    expect(screen.getByText('Select an element')).toBeInTheDocument();
   });
 
   it('shows EntityProperties when an entity is selected', () => {

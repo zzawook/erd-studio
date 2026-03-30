@@ -89,7 +89,7 @@ export function ChenEdge({
               pointerEvents: 'all',
               zIndex: 1000,
             }}
-            className="text-xs font-medium text-gray-700"
+            className="text-[11px] font-semibold text-gray-600 bg-white/90 px-1.5 py-0.5 rounded border border-gray-200/50 shadow-sm"
             data-testid="chen-edge-label"
           >
             {formatCardinality(data.cardinality)}

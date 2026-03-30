@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useERDStore } from '../ir/store';
 import type { Participant } from '../ir/types';
 import { validateCardinality } from '../utils/validation';
+import { CollapsibleSection } from './CollapsibleSection';
+import { showToast } from './Toast';
 
 export function Sidebar() {
   const model = useERDStore((s) => s.model);
@@ -36,6 +38,7 @@ export function Sidebar() {
     const id = addEntity(entityName.trim(), { x, y });
     setEntityName('');
     setSelection({ type: 'entity', entityId: id });
+    showToast(`Entity "${entityName.trim()}" created`, 'success');
   };
 
   const handleAddRelationship = () => {
@@ -104,6 +107,7 @@ export function Sidebar() {
     setRelIdentifying(false);
     setRelError('');
     setSelection({ type: 'relationship', relationshipId: id });
+    showToast(`Relationship "${relName.trim()}" created`, 'success');
   };
 
   const selectedEntityId = selection && selection.type === 'entity' ? selection.entityId
@@ -113,47 +117,79 @@ export function Sidebar() {
     : selection && selection.type === 'relAttribute' ? selection.relationshipId
     : null;
 
+  const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow";
+  const selectClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow";
+  const btnPrimary = "w-full px-3 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+
   return (
-    <div className="h-full w-full border-r border-gray-200 bg-gray-50 p-3 overflow-y-auto flex flex-col gap-4 text-xs [scrollbar-gutter:stable]" data-testid="sidebar">
-      {/* Add Entity */}
-      <div>
-        <h3 className="font-bold text-gray-700 mb-1">Add Entity</h3>
-        <div className="flex gap-1">
+    <div className="h-full w-full bg-white overflow-y-auto custom-scrollbar flex flex-col text-sm" data-testid="sidebar">
+
+      {/* ── Entities ── */}
+      <CollapsibleSection title="Entities" count={model.entities.length}>
+        {/* Add Entity form */}
+        <div className="flex gap-2">
           <input
             value={entityName}
             onChange={(e) => setEntityName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddEntity()}
             placeholder="Entity name"
-            className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+            className={`flex-1 ${inputClass}`}
             data-testid="entity-name-input"
           />
           <button
             onClick={handleAddEntity}
             disabled={!entityName.trim()}
-            className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="add-entity-button"
           >
             Add
           </button>
         </div>
-      </div>
 
-      {/* Add Relationship */}
-      <div>
-        <h3 className="font-bold text-gray-700 mb-1">Add Relationship</h3>
-        <div className="flex flex-col gap-1">
+        {/* Entity list */}
+        <div className="mt-3 flex flex-col gap-0.5">
+          {model.entities.length === 0 && (
+            <div className="text-center py-4">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="mx-auto mb-2 text-gray-300">
+                <rect x="4" y="8" width="24" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
+              </svg>
+              <p className="text-gray-400 text-xs">No entities yet</p>
+              <p className="text-gray-300 text-[11px]">Use the form above to add one</p>
+            </div>
+          )}
+          {model.entities.map((e) => (
+            <div
+              key={e.id}
+              onClick={() => setSelection({ type: 'entity', entityId: e.id })}
+              className={`px-3 py-2 rounded-md cursor-pointer flex items-center gap-2 transition-colors
+                ${selectedEntityId === e.id
+                  ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-200'
+                  : 'hover:bg-gray-50 text-gray-700'}`}
+              data-testid={`entity-list-item-${e.id}`}
+            >
+              <span className="w-2 h-2 rounded-sm bg-primary-400 shrink-0" />
+              <span className="truncate">{e.isWeak ? `⟨${e.name}⟩` : e.name}</span>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
+
+      {/* ── Relationships ── */}
+      <CollapsibleSection title="Relationships" count={model.relationships.length}>
+        {/* Add Relationship form */}
+        <div className="flex flex-col gap-2">
           <input
             value={relName}
             onChange={(e) => { setRelName(e.target.value); setRelError(''); }}
             placeholder="Relationship name"
-            className="px-2 py-1 border border-gray-300 rounded"
+            className={inputClass}
             data-testid="rel-name-input"
           />
 
           <select
             value={relEntity1}
             onChange={(e) => { setRelEntity1(e.target.value); setRelError(''); }}
-            className="px-2 py-1 border border-gray-300 rounded"
+            className={selectClass}
             data-testid="rel-entity1-select"
           >
             <option value="">Entity 1...</option>
@@ -165,27 +201,34 @@ export function Sidebar() {
             ))}
           </select>
 
-          <div className="flex gap-1 items-center">
-            <label className="text-gray-500 w-5 shrink-0">min</label>
-            <input
-              value={relMin1}
-              onChange={(e) => { setRelMin1(e.target.value); setRelError(''); }}
-              className="flex-1 min-w-[40px] px-1 py-0.5 border border-gray-300 rounded text-center"
-              data-testid="rel-min1-input"
-            />
-            <label className="text-gray-500 w-5 shrink-0">max</label>
-            <input
-              value={relMax1}
-              onChange={(e) => { setRelMax1(e.target.value); setRelError(''); }}
-              className="flex-1 min-w-[40px] px-1 py-0.5 border border-gray-300 rounded text-center"
-              data-testid="rel-max1-input"
-            />
+          {/* Cardinality 1 */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Min</label>
+              <input
+                value={relMin1}
+                onChange={(e) => { setRelMin1(e.target.value); setRelError(''); }}
+                className={`${inputClass} text-center`}
+                placeholder="0"
+                data-testid="rel-min1-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Max</label>
+              <input
+                value={relMax1}
+                onChange={(e) => { setRelMax1(e.target.value); setRelError(''); }}
+                className={`${inputClass} text-center`}
+                placeholder="*"
+                data-testid="rel-max1-input"
+              />
+            </div>
           </div>
 
           <select
             value={relEntity2}
             onChange={(e) => { setRelEntity2(e.target.value); setRelError(''); }}
-            className="px-2 py-1 border border-gray-300 rounded"
+            className={selectClass}
             data-testid="rel-entity2-select"
           >
             <option value="">Entity 2...</option>
@@ -197,94 +240,97 @@ export function Sidebar() {
             ))}
           </select>
 
-          <div className="flex gap-1 items-center">
-            <label className="text-gray-500 w-5 shrink-0">min</label>
-            <input
-              value={relMin2}
-              onChange={(e) => { setRelMin2(e.target.value); setRelError(''); }}
-              className="flex-1 min-w-[40px] px-1 py-0.5 border border-gray-300 rounded text-center"
-              data-testid="rel-min2-input"
-            />
-            <label className="text-gray-500 w-5 shrink-0">max</label>
-            <input
-              value={relMax2}
-              onChange={(e) => { setRelMax2(e.target.value); setRelError(''); }}
-              className="flex-1 min-w-[40px] px-1 py-0.5 border border-gray-300 rounded text-center"
-              data-testid="rel-max2-input"
-            />
+          {/* Cardinality 2 */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Min</label>
+              <input
+                value={relMin2}
+                onChange={(e) => { setRelMin2(e.target.value); setRelError(''); }}
+                className={`${inputClass} text-center`}
+                placeholder="0"
+                data-testid="rel-min2-input"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Max</label>
+              <input
+                value={relMax2}
+                onChange={(e) => { setRelMax2(e.target.value); setRelError(''); }}
+                className={`${inputClass} text-center`}
+                placeholder="*"
+                data-testid="rel-max2-input"
+              />
+            </div>
           </div>
 
-          <label className="flex items-center gap-1 text-gray-600">
+          <label className="flex items-center gap-2 text-sm text-gray-600 py-1">
             <input
               type="checkbox"
               checked={relIdentifying}
               onChange={(e) => setRelIdentifying(e.target.checked)}
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               data-testid="rel-identifying-checkbox"
             />
             Identifying
           </label>
 
-          {relError && <p className="text-red-500 text-[10px]" data-testid="rel-error">{relError}</p>}
+          {relError && <p className="text-red-500 text-xs" data-testid="rel-error">{relError}</p>}
 
           <button
             onClick={handleAddRelationship}
-            className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className={btnPrimary}
             data-testid="add-relationship-button"
           >
-            Create
+            Create Relationship
           </button>
         </div>
-      </div>
 
-      {/* Entity list */}
-      <div>
-        <h3 className="font-bold text-gray-700 mb-1">Entities</h3>
-        {model.entities.length === 0 && <p className="text-gray-400 italic">None</p>}
-        {model.entities.map((e) => (
-          <div
-            key={e.id}
-            onClick={() => setSelection({ type: 'entity', entityId: e.id })}
-            className={`px-2 py-1 rounded cursor-pointer truncate
-              ${selectedEntityId === e.id ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-200'}`}
-            data-testid={`entity-list-item-${e.id}`}
-          >
-            {e.isWeak ? `⟨${e.name}⟩` : e.name}
-          </div>
-        ))}
-      </div>
+        {/* Relationship list */}
+        <div className="mt-3 flex flex-col gap-0.5">
+          {model.relationships.length === 0 && (
+            <div className="text-center py-4">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="mx-auto mb-2 text-gray-300">
+                <polygon points="16,4 28,16 16,28 4,16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" fill="none" />
+              </svg>
+              <p className="text-gray-400 text-xs">No relationships yet</p>
+              <p className="text-gray-300 text-[11px]">Add entities first, then create relationships</p>
+            </div>
+          )}
+          {model.relationships.map((r) => (
+            <div
+              key={r.id}
+              onClick={() => setSelection({ type: 'relationship', relationshipId: r.id })}
+              className={`px-3 py-2 rounded-md cursor-pointer flex items-center gap-2 transition-colors
+                ${selectedRelId === r.id
+                  ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-200'
+                  : 'hover:bg-gray-50 text-gray-700'}`}
+              data-testid={`rel-list-item-${r.id}`}
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" className="shrink-0 text-amber-400">
+                <polygon points="4,0 8,4 4,8 0,4" fill="currentColor" />
+              </svg>
+              <span className="truncate">{r.name}</span>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
 
-      {/* Relationship list */}
-      <div>
-        <h3 className="font-bold text-gray-700 mb-1">Relationships</h3>
-        {model.relationships.length === 0 && <p className="text-gray-400 italic">None</p>}
-        {model.relationships.map((r) => (
-          <div
-            key={r.id}
-            onClick={() => setSelection({ type: 'relationship', relationshipId: r.id })}
-            className={`px-2 py-1 rounded cursor-pointer truncate
-              ${selectedRelId === r.id ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-200'}`}
-            data-testid={`rel-list-item-${r.id}`}
-          >
-            {r.name}
-          </div>
-        ))}
-      </div>
-
-      {/* Add Aggregation */}
-      <div>
-        <h3 className="font-bold text-gray-700 mb-1">Add Aggregation</h3>
-        <div className="flex flex-col gap-1">
+      {/* ── Aggregations ── */}
+      <CollapsibleSection title="Aggregations" count={model.aggregations.length} defaultOpen={false}>
+        {/* Add Aggregation form */}
+        <div className="flex flex-col gap-2">
           <input
             value={aggName}
             onChange={(e) => setAggName(e.target.value)}
             placeholder="Aggregation name"
-            className="px-2 py-1 border border-gray-300 rounded"
+            className={inputClass}
             data-testid="agg-name-input"
           />
           <select
             value={aggRelId}
             onChange={(e) => setAggRelId(e.target.value)}
-            className="px-2 py-1 border border-gray-300 rounded"
+            className={selectClass}
             data-testid="agg-rel-select"
           >
             <option value="">Relationship to aggregate...</option>
@@ -296,38 +342,50 @@ export function Sidebar() {
             onClick={() => {
               if (!aggName.trim() || !aggRelId) return;
               const id = addAggregation(aggName.trim(), aggRelId);
+              showToast(`Aggregation "${aggName.trim()}" created`, 'success');
               setAggName('');
               setAggRelId('');
               setSelection({ type: 'aggregation', aggregationId: id });
             }}
             disabled={!aggName.trim() || !aggRelId}
-            className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className={btnPrimary}
             data-testid="add-agg-button"
           >
-            Create
+            Create Aggregation
           </button>
         </div>
-      </div>
 
-      {/* Aggregation list */}
-      <div>
-        <h3 className="font-bold text-gray-700 mb-1">Aggregations</h3>
-        {model.aggregations.length === 0 && <p className="text-gray-400 italic">None</p>}
-        {model.aggregations.map((a) => {
-          const isSelected = selection?.type === 'aggregation' && selection.aggregationId === a.id;
-          return (
-            <div
-              key={a.id}
-              onClick={() => setSelection({ type: 'aggregation', aggregationId: a.id })}
-              className={`px-2 py-1 rounded cursor-pointer truncate
-                ${isSelected ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-200'}`}
-              data-testid={`agg-list-item-${a.id}`}
-            >
-              {a.name}
+        {/* Aggregation list */}
+        <div className="mt-3 flex flex-col gap-0.5">
+          {model.aggregations.length === 0 && (
+            <div className="text-center py-4">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="mx-auto mb-2 text-gray-300">
+                <rect x="6" y="6" width="20" height="20" rx="2" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
+                <rect x="10" y="10" width="12" height="12" rx="1" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" />
+              </svg>
+              <p className="text-gray-400 text-xs">No aggregations yet</p>
+              <p className="text-gray-300 text-[11px]">Create relationships first</p>
             </div>
-          );
-        })}
-      </div>
+          )}
+          {model.aggregations.map((a) => {
+            const isSelected = selection?.type === 'aggregation' && selection.aggregationId === a.id;
+            return (
+              <div
+                key={a.id}
+                onClick={() => setSelection({ type: 'aggregation', aggregationId: a.id })}
+                className={`px-3 py-2 rounded-md cursor-pointer flex items-center gap-2 transition-colors
+                  ${isSelected
+                    ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-200'
+                    : 'hover:bg-gray-50 text-gray-700'}`}
+                data-testid={`agg-list-item-${a.id}`}
+              >
+                <span className="w-2 h-2 rounded-[1px] border border-emerald-400 shrink-0" />
+                <span className="truncate">{a.name}</span>
+              </div>
+            );
+          })}
+        </div>
+      </CollapsibleSection>
     </div>
   );
 }

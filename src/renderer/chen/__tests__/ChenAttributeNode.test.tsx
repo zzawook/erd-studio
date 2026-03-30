@@ -76,7 +76,7 @@ describe('ChenAttributeNode', () => {
     );
 
     const circle = screen.getByTestId('attr-circle');
-    expect(circle.className).toContain('bg-gray-800');
+    expect(circle.className).toContain('bg-primary-600');
   });
 
   it('renders an open circle for partial key attributes (per CS4221)', () => {
@@ -137,7 +137,7 @@ describe('ChenAttributeNode', () => {
     );
 
     const node = screen.getByTestId('chen-attribute-node');
-    expect(node.className).toContain('bg-blue-100');
+    expect(node.className).toContain('bg-primary-50');
   });
 
   it('underlines primary key attribute label', () => {

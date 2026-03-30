@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useERDStore } from '../../ir/store';
 import type { Relationship } from '../../ir/types';
 import { validateCardinality } from '../../utils/validation';
@@ -17,6 +17,13 @@ export function RelationshipProperties({ relationship }: Props) {
 
   const [newAttrName, setNewAttrName] = useState('');
   const [cardErrors, setCardErrors] = useState<Record<number, string>>({});
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(timer);
+  }, [confirming]);
 
   const handleCardinalityChange = (index: number, field: 'min' | 'max', value: string) => {
     const participant = relationship.participants[index];
@@ -45,96 +52,107 @@ export function RelationshipProperties({ relationship }: Props) {
     setSelection({ type: 'relAttribute', relationshipId: relationship.id, attributeId: id });
   };
 
+  const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow";
+
   return (
-    <div className="flex flex-col gap-3" data-testid="relationship-properties">
+    <div className="flex flex-col gap-4" data-testid="relationship-properties">
       {/* Name */}
       <div>
-        <label className="block text-gray-600 mb-0.5">Name</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
         <input
           value={relationship.name}
           onChange={(e) => updateRelationship(relationship.id, { name: e.target.value })}
-          className="w-full px-2 py-1 border border-gray-300 rounded"
+          className={inputClass}
           data-testid="rel-name-edit"
         />
       </div>
 
       {/* Identifying */}
-      <label className="flex items-center gap-1.5 text-gray-600">
+      <label className="flex items-center gap-2 text-sm text-gray-600">
         <input
           type="checkbox"
           checked={relationship.isIdentifying}
           onChange={(e) => updateRelationship(relationship.id, { isIdentifying: e.target.checked })}
+          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
           data-testid="rel-identifying-edit"
         />
         Identifying Relationship
       </label>
 
       {/* Participants */}
-      <div>
-        <h4 className="font-bold text-gray-700 mb-1">Participants</h4>
-        {relationship.participants.map((p, i) => {
-          const entity = model.entities.find((e) => e.id === p.entityId);
-          return (
-            <div key={i} className="mb-2 p-2 bg-white rounded border border-gray-200">
-              <div className="font-medium text-gray-700 mb-1">
-                {entity?.name ?? 'Unknown'}
-                {p.role ? ` (${p.role})` : ''}
+      <div className="border-t border-gray-100 pt-3">
+        <h4 className="font-semibold text-gray-700 mb-2 text-sm">Participants</h4>
+        <div className="flex flex-col gap-2">
+          {relationship.participants.map((p, i) => {
+            const entity = model.entities.find((e) => e.id === p.entityId);
+            return (
+              <div key={i} className="p-3 bg-gray-50 rounded-lg border-l-2 border-primary-400">
+                <div className="font-medium text-gray-700 mb-2 text-sm">
+                  {entity?.name ?? 'Unknown'}
+                  {p.role ? ` (${p.role})` : ''}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Min</label>
+                    <input
+                      defaultValue={String(p.cardinality.min)}
+                      onBlur={(e) => handleCardinalityChange(i, 'min', e.target.value)}
+                      className={`w-full px-3 py-1.5 border rounded-md text-sm text-center shadow-sm outline-none transition-shadow focus:ring-2 focus:ring-primary-500 ${cardErrors[i] ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`}
+                      data-testid={`participant-min-${i}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Max</label>
+                    <input
+                      defaultValue={String(p.cardinality.max)}
+                      onBlur={(e) => handleCardinalityChange(i, 'max', e.target.value)}
+                      className={`w-full px-3 py-1.5 border rounded-md text-sm text-center shadow-sm outline-none transition-shadow focus:ring-2 focus:ring-primary-500 ${cardErrors[i] ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white'}`}
+                      data-testid={`participant-max-${i}`}
+                    />
+                  </div>
+                </div>
+                {cardErrors[i] && (
+                  <p className="text-red-500 text-xs mt-1" data-testid={`participant-error-${i}`}>
+                    {cardErrors[i]}
+                  </p>
+                )}
               </div>
-              <div className="flex gap-1 items-center">
-                <label className="text-gray-500 w-6">min</label>
-                <input
-                  defaultValue={String(p.cardinality.min)}
-                  onBlur={(e) => handleCardinalityChange(i, 'min', e.target.value)}
-                  className={`flex-1 px-1 py-0.5 border rounded text-center ${cardErrors[i] ? 'border-red-500' : 'border-gray-300'}`}
-                  data-testid={`participant-min-${i}`}
-                />
-                <label className="text-gray-500 w-6">max</label>
-                <input
-                  defaultValue={String(p.cardinality.max)}
-                  onBlur={(e) => handleCardinalityChange(i, 'max', e.target.value)}
-                  className={`flex-1 px-1 py-0.5 border rounded text-center ${cardErrors[i] ? 'border-red-500' : 'border-gray-300'}`}
-                  data-testid={`participant-max-${i}`}
-                />
-              </div>
-              {cardErrors[i] && (
-                <p className="text-red-500 text-[10px] mt-0.5" data-testid={`participant-error-${i}`}>
-                  {cardErrors[i]}
-                </p>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Relationship Attributes */}
-      <div>
-        <h4 className="font-bold text-gray-700 mb-1">Relationship Attributes</h4>
+      <div className="border-t border-gray-100 pt-3">
+        <h4 className="font-semibold text-gray-700 mb-2 text-sm">Relationship Attributes</h4>
         {relationship.attributes.length === 0 && (
-          <p className="text-gray-400 italic">No attributes</p>
+          <p className="text-gray-400 italic text-xs py-1">No attributes</p>
         )}
-        {relationship.attributes.map((attr) => (
-          <div
-            key={attr.id}
-            onClick={() => setSelection({ type: 'relAttribute', relationshipId: relationship.id, attributeId: attr.id })}
-            className="px-2 py-0.5 rounded cursor-pointer hover:bg-gray-200 flex justify-between"
-          >
-            <span>{attr.name}</span>
-            <span className="text-gray-400">{attr.dataType.name}</span>
-          </div>
-        ))}
-        <div className="flex gap-1 mt-1">
+        <div className="flex flex-col gap-0.5">
+          {relationship.attributes.map((attr) => (
+            <div
+              key={attr.id}
+              onClick={() => setSelection({ type: 'relAttribute', relationshipId: relationship.id, attributeId: attr.id })}
+              className="px-3 py-1.5 rounded-md cursor-pointer hover:bg-gray-50 flex justify-between items-center transition-colors"
+            >
+              <span className="text-sm text-gray-700">{attr.name}</span>
+              <span className="font-mono text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{attr.dataType.name}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
           <input
             value={newAttrName}
             onChange={(e) => setNewAttrName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddAttribute()}
             placeholder="Attribute name"
-            className="flex-1 px-2 py-0.5 border border-gray-300 rounded"
+            className={`flex-1 ${inputClass}`}
             data-testid="new-rel-attr-name"
           />
           <button
             onClick={handleAddAttribute}
             disabled={!newAttrName.trim()}
-            className="px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="shrink-0 px-3 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="add-rel-attr-button"
           >
             Add
@@ -143,17 +161,37 @@ export function RelationshipProperties({ relationship }: Props) {
       </div>
 
       {/* Delete */}
-      <button
-        onClick={() => {
-          if (window.confirm(`Delete relationship "${relationship.name}"?`)) {
-            deleteRelationship(relationship.id);
-          }
-        }}
-        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mt-2"
-        data-testid="delete-rel-button"
-      >
-        Delete Relationship
-      </button>
+      <div className="border-t border-red-100 pt-4 mt-2">
+        {!confirming ? (
+          <button
+            onClick={() => setConfirming(true)}
+            className="w-full py-2 border border-red-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 hover:border-red-300 transition-colors"
+            data-testid="delete-rel-button"
+          >
+            Delete Relationship
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirming(false)}
+              className="flex-1 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                deleteRelationship(relationship.id);
+                setConfirming(false);
+              }}
+              className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
+              style={{ animation: 'confirm-pulse 1.5s ease-in-out infinite' }}
+              data-testid="delete-rel-button"
+            >
+              Confirm Delete
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

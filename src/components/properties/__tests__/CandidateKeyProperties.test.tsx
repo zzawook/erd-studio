@@ -203,7 +203,7 @@ describe('CandidateKeyProperties', () => {
 
     render(<CandidateKeyProperties entity={getEntity(entityId)} />);
     const ckItem = screen.getByTestId(`ck-item-${ckId}`);
-    const span = ckItem.querySelector('span.font-bold');
+    const span = ckItem.querySelector('span.font-semibold');
     expect(span).not.toBeNull();
   });
 

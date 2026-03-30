@@ -11,15 +11,22 @@ export function NotationSwitcher() {
   ];
 
   return (
-    <div className="flex rounded-md border border-gray-300 overflow-hidden" data-testid="notation-switcher">
+    <div
+      className="flex rounded-lg border border-gray-200 overflow-hidden shadow-sm"
+      role="radiogroup"
+      aria-label="Notation style"
+      data-testid="notation-switcher"
+    >
       {options.map((opt) => (
         <button
           key={opt.value}
           onClick={() => setNotation(opt.value)}
-          className={`px-3 py-1 text-xs font-medium transition-colors
+          role="radio"
+          aria-checked={notation === opt.value}
+          className={`px-4 py-1.5 text-sm font-medium transition-all duration-200
             ${notation === opt.value
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-100'
+              ? 'bg-primary-600 text-white shadow-inner'
+              : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
           data-testid={`notation-${opt.value}`}
         >

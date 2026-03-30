@@ -135,23 +135,25 @@ describe('EntityProperties', () => {
 
   it('deletes entity when delete button is clicked and confirmed', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<EntityProperties entity={getEntity(entityId)} />);
+    // First click shows the confirm UI
+    await user.click(screen.getByTestId('delete-entity-button'));
+    // Second click on the confirm button actually deletes
     await user.click(screen.getByTestId('delete-entity-button'));
 
     expect(useERDStore.getState().model.entities).toHaveLength(0);
-    vi.restoreAllMocks();
   });
 
   it('does not delete entity when confirm is cancelled', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     render(<EntityProperties entity={getEntity(entityId)} />);
+    // First click shows the confirm UI
     await user.click(screen.getByTestId('delete-entity-button'));
+    // Click Cancel instead of confirm
+    await user.click(screen.getByText('Cancel'));
 
     expect(useERDStore.getState().model.entities).toHaveLength(1);
-    vi.restoreAllMocks();
   });
 });

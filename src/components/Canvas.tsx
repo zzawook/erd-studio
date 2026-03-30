@@ -5,6 +5,7 @@ import {
   MiniMap,
   Background,
   BackgroundVariant,
+  Panel,
   applyNodeChanges,
   type NodeTypes,
   type EdgeTypes,
@@ -164,6 +165,8 @@ export function Canvas() {
     setSelection(null);
   }, [setSelection]);
 
+  const isEmpty = model.entities.length === 0 && model.relationships.length === 0;
+
   return (
     <div className="flex-1 h-full" data-testid="canvas">
       <ReactFlow
@@ -177,11 +180,48 @@ export function Canvas() {
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
         fitView
+        fitViewOptions={{ padding: 0.2 }}
         proOptions={{ hideAttribution: true }}
       >
         <Controls />
-        <MiniMap zoomable pannable />
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        <MiniMap
+          zoomable
+          pannable
+          nodeColor="#94a3b8"
+          maskColor="rgba(0,0,0,0.08)"
+          style={{ backgroundColor: '#f8fafc' }}
+        />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="#e2e8f0" />
+
+        {/* Welcome overlay for empty canvas */}
+        {isEmpty && (
+          <Panel position="top-center">
+            <div className="mt-24 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 p-8 max-w-sm text-center" style={{ animation: 'fade-in 0.3s ease-out' }}>
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" className="mx-auto mb-4 text-primary-400">
+                <rect x="4" y="6" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="22" y="24" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                <polygon points="20,16 26,20 20,24 14,20" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                <path d="M11 16v4h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M29 24v-4h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <h3 className="text-base font-semibold text-gray-800 mb-2">Start Your ER Diagram</h3>
+              <div className="text-sm text-gray-500 space-y-2 text-left">
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <span>Add an entity using the sidebar</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <span>Define attributes and keys</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <span>Create relationships between entities</span>
+                </div>
+              </div>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );

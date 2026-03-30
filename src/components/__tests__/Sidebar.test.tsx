@@ -24,7 +24,7 @@ describe('Sidebar', () => {
 
   it('renders Add Entity section', () => {
     render(<Sidebar />);
-    expect(screen.getByText('Add Entity')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Entities/i })).toBeInTheDocument();
     expect(screen.getByTestId('entity-name-input')).toBeInTheDocument();
     expect(screen.getByTestId('add-entity-button')).toBeInTheDocument();
   });
@@ -89,11 +89,11 @@ describe('Sidebar', () => {
   // Entity list
   // -----------------------------------------------------------------------
 
-  it('shows "None" when there are no entities', () => {
+  it('shows empty state text when there are no entities', () => {
     render(<Sidebar />);
-    // Entity, relationship, and aggregation lists show "None" when empty
-    const noneTexts = screen.getAllByText('None');
-    expect(noneTexts.length).toBe(3);
+    expect(screen.getByText('No entities yet')).toBeInTheDocument();
+    expect(screen.getByText('No relationships yet')).toBeInTheDocument();
+    expect(screen.getByText('No aggregations yet')).toBeInTheDocument();
   });
 
   it('displays entities in the list', () => {
@@ -136,7 +136,7 @@ describe('Sidebar', () => {
 
   it('renders Add Relationship section', () => {
     render(<Sidebar />);
-    expect(screen.getByText('Add Relationship')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Relationships/i })).toBeInTheDocument();
     expect(screen.getByTestId('rel-name-input')).toBeInTheDocument();
     expect(screen.getByTestId('rel-entity1-select')).toBeInTheDocument();
     expect(screen.getByTestId('rel-entity2-select')).toBeInTheDocument();
@@ -260,11 +260,9 @@ describe('Sidebar', () => {
   // Relationship list
   // -----------------------------------------------------------------------
 
-  it('shows "None" for relationships when empty', () => {
+  it('shows empty state text for relationships when empty', () => {
     render(<Sidebar />);
-    // There are two "None" texts - one for entities, one for relationships
-    const noneTexts = screen.getAllByText('None');
-    expect(noneTexts.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('No relationships yet')).toBeInTheDocument();
   });
 
   it('displays relationships in the list', () => {
@@ -311,7 +309,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />);
     const item = screen.getByTestId(`entity-list-item-${eid}`);
-    expect(item.className).toContain('bg-blue-100');
+    expect(item.className).toContain('bg-primary-50');
   });
 
   it('highlights relationship when relAttribute is selected', () => {
@@ -326,7 +324,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />);
     const item = screen.getByTestId(`rel-list-item-${rid}`);
-    expect(item.className).toContain('bg-blue-100');
+    expect(item.className).toContain('bg-primary-50');
   });
 
   // -----------------------------------------------------------------------
@@ -382,7 +380,7 @@ describe('Sidebar', () => {
 
   it('renders Add Aggregation section', () => {
     render(<Sidebar />);
-    expect(screen.getByText('Add Aggregation')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Aggregations/i })).toBeInTheDocument();
     expect(screen.getByTestId('agg-name-input')).toBeInTheDocument();
     expect(screen.getByTestId('agg-rel-select')).toBeInTheDocument();
     expect(screen.getByTestId('add-agg-button')).toBeInTheDocument();
@@ -468,7 +466,7 @@ describe('Sidebar', () => {
 
     render(<Sidebar />);
     const item = screen.getByTestId(`agg-list-item-${aggId}`);
-    expect(item.className).toContain('bg-blue-100');
+    expect(item.className).toContain('bg-primary-50');
   });
 
   // -----------------------------------------------------------------------

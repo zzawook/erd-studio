@@ -129,101 +129,121 @@ export function AttributeProperties({ attribute, entityId, relationshipId, conte
     : [];
 
   const entityName = entityId ? model.entities.find((e) => e.id === entityId)?.name ?? '' : '';
+  const parentName = entityId
+    ? model.entities.find((e) => e.id === entityId)?.name
+    : model.relationships.find((r) => r.id === relationshipId)?.name;
+
+  const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow";
 
   return (
-    <div className="flex flex-col gap-2" data-testid="attribute-properties">
+    <div className="flex flex-col gap-3" data-testid="attribute-properties">
+      {/* Breadcrumb */}
       <button
         onClick={() => {
           if (entityId) setSelection({ type: 'entity', entityId });
           else if (relationshipId) setSelection({ type: 'relationship', relationshipId });
         }}
-        className="text-blue-600 text-left hover:underline text-[10px]"
+        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors py-1 self-start"
       >
-        &larr; Back
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        <span className="text-gray-400">{parentName}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        <span className="font-medium text-gray-700">{attribute.name}</span>
       </button>
 
       {/* Name */}
       <div>
-        <label className="block text-gray-600 mb-0.5">Name</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
         <input
           value={attribute.name}
           onChange={(e) => update({ name: e.target.value })}
-          className="w-full px-2 py-1 border border-gray-300 rounded"
+          className={inputClass}
           data-testid="attr-name-edit"
         />
       </div>
 
-      {/* Data Type */}
-      <div>
-        <label className="block text-gray-600 mb-0.5">Data Type</label>
-        <select
-          value={attribute.dataType.name}
-          onChange={(e) => update({ dataType: { ...attribute.dataType, name: e.target.value } })}
-          className="w-full px-2 py-1 border border-gray-300 rounded"
-          data-testid="attr-type-select"
-        >
-          {DATA_TYPE_NAMES.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+      {/* Data Type group */}
+      <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 flex flex-col gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Data Type</label>
+          <select
+            value={attribute.dataType.name}
+            onChange={(e) => update({ dataType: { ...attribute.dataType, name: e.target.value } })}
+            className={inputClass}
+            data-testid="attr-type-select"
+          >
+            {DATA_TYPE_NAMES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Precision */}
+        {showPrecision && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Precision</label>
+            <input
+              type="number"
+              value={attribute.dataType.precision ?? ''}
+              onChange={(e) => update({
+                dataType: {
+                  ...attribute.dataType,
+                  precision: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                },
+              })}
+              className={inputClass}
+              data-testid="attr-precision-input"
+            />
+          </div>
+        )}
+
+        {/* Scale */}
+        {showScale && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Scale</label>
+            <input
+              type="number"
+              value={attribute.dataType.scale ?? ''}
+              onChange={(e) => update({
+                dataType: {
+                  ...attribute.dataType,
+                  scale: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                },
+              })}
+              className={inputClass}
+              data-testid="attr-scale-input"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Precision */}
-      {showPrecision && (
-        <div>
-          <label className="block text-gray-600 mb-0.5">Precision</label>
+      {/* Nullable — toggle switch */}
+      <label className="flex items-center justify-between text-sm text-gray-600 py-1">
+        <span>Nullable</span>
+        <span className="relative inline-flex items-center cursor-pointer">
           <input
-            type="number"
-            value={attribute.dataType.precision ?? ''}
-            onChange={(e) => update({
-              dataType: {
-                ...attribute.dataType,
-                precision: e.target.value ? parseInt(e.target.value, 10) : undefined,
-              },
-            })}
-            className="w-full px-2 py-1 border border-gray-300 rounded"
-            data-testid="attr-precision-input"
+            type="checkbox"
+            checked={attribute.nullable}
+            onChange={(e) => update({ nullable: e.target.checked })}
+            className="sr-only peer"
+            data-testid="attr-nullable-checkbox"
           />
-        </div>
-      )}
-
-      {/* Scale */}
-      {showScale && (
-        <div>
-          <label className="block text-gray-600 mb-0.5">Scale</label>
-          <input
-            type="number"
-            value={attribute.dataType.scale ?? ''}
-            onChange={(e) => update({
-              dataType: {
-                ...attribute.dataType,
-                scale: e.target.value ? parseInt(e.target.value, 10) : undefined,
-              },
-            })}
-            className="w-full px-2 py-1 border border-gray-300 rounded"
-            data-testid="attr-scale-input"
-          />
-        </div>
-      )}
-
-      {/* Nullable */}
-      <label className="flex items-center gap-1.5 text-gray-600">
-        <input
-          type="checkbox"
-          checked={attribute.nullable}
-          onChange={(e) => update({ nullable: e.target.checked })}
-          data-testid="attr-nullable-checkbox"
-        />
-        Nullable
+          <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:bg-primary-600 transition-colors" />
+          <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
+        </span>
       </label>
 
       {/* Kind */}
       <div>
-        <label className="block text-gray-600 mb-0.5">Kind</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Kind</label>
         <select
           value={attribute.kind}
           onChange={(e) => update({ kind: e.target.value as AttributeKind })}
-          className="w-full px-2 py-1 border border-gray-300 rounded"
+          className={inputClass}
           data-testid="attr-kind-select"
         >
           <option value="simple">Simple</option>
@@ -233,34 +253,41 @@ export function AttributeProperties({ attribute, entityId, relationshipId, conte
         </select>
       </div>
 
-      {/* Partial Key */}
+      {/* Partial Key — toggle switch */}
       {context === 'entity' && (
         <div>
-          <label className="flex items-center gap-1.5 text-gray-600">
-            <input
-              type="checkbox"
-              checked={attribute.isPartialKey}
-              onChange={(e) => handlePartialKeyToggle(e.target.checked)}
-              data-testid="attr-partial-key-checkbox"
-            />
-            Partial Key
+          <label className="flex items-center justify-between text-sm text-gray-600 py-1">
+            <span>Partial Key</span>
+            <span className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={attribute.isPartialKey}
+                onChange={(e) => handlePartialKeyToggle(e.target.checked)}
+                className="sr-only peer"
+                data-testid="attr-partial-key-checkbox"
+              />
+              <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary-300 rounded-full peer peer-checked:bg-primary-600 transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
+            </span>
           </label>
           {pkInfo.hasIdentifying && attribute.isPartialKey && (
-            <p className="text-[10px] text-green-600 mt-0.5 ml-5">
-              Connected to identifying relationship line
+            <p className="text-xs text-green-600 mt-1 ml-1">
+              Connected to identifying relationship
             </p>
           )}
         </div>
       )}
 
       {/* Delete */}
-      <button
-        onClick={handleDelete}
-        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mt-1"
-        data-testid="delete-attr-button"
-      >
-        Delete Attribute
-      </button>
+      <div className="border-t border-red-100 pt-3 mt-1">
+        <button
+          onClick={handleDelete}
+          className="w-full py-2 border border-red-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 hover:border-red-300 transition-colors"
+          data-testid="delete-attr-button"
+        >
+          Delete Attribute
+        </button>
+      </div>
 
       {/* Identifying Relationship Picker */}
       {showRelPicker && (

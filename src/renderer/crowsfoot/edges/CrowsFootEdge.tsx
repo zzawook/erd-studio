@@ -136,7 +136,7 @@ export function CrowsFootEdge({
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               pointerEvents: 'all',
             }}
-            className="bg-white px-1.5 py-0.5 text-xs font-medium text-gray-700 rounded border border-gray-300"
+            className="bg-white/95 px-2 py-1 text-xs font-semibold text-gray-600 rounded-md border border-gray-200 shadow-sm"
             data-testid="crowsfoot-edge-label"
           >
             {data.relationship.name}
