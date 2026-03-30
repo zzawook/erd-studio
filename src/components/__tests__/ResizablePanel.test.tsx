@@ -131,4 +131,91 @@ describe('ResizablePanel', () => {
     // delta = 600 - 200 = 400; newWidth = min(300, 200 + 400) = 300
     expect(panel.style.width).toBe('300px');
   });
+
+  describe('keyboard resize (onKeyDown)', () => {
+    it('decreases width on ArrowLeft', () => {
+      render(
+        <ResizablePanel defaultWidth={250} minWidth={100} maxWidth={400} side="left">
+          <span>Content</span>
+        </ResizablePanel>,
+      );
+
+      const handle = screen.getByTestId('resize-handle');
+      const panel = screen.getByTestId('resizable-panel');
+
+      fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+
+      // step=10, 250 - 10 = 240
+      expect(panel.style.width).toBe('240px');
+    });
+
+    it('increases width on ArrowRight', () => {
+      render(
+        <ResizablePanel defaultWidth={250} minWidth={100} maxWidth={400} side="left">
+          <span>Content</span>
+        </ResizablePanel>,
+      );
+
+      const handle = screen.getByTestId('resize-handle');
+      const panel = screen.getByTestId('resizable-panel');
+
+      fireEvent.keyDown(handle, { key: 'ArrowRight' });
+
+      // step=10, 250 + 10 = 260
+      expect(panel.style.width).toBe('260px');
+    });
+
+    it('clamps width to minWidth on ArrowLeft', () => {
+      render(
+        <ResizablePanel defaultWidth={105} minWidth={100} maxWidth={400} side="left">
+          <span>Content</span>
+        </ResizablePanel>,
+      );
+
+      const handle = screen.getByTestId('resize-handle');
+      const panel = screen.getByTestId('resizable-panel');
+
+      // Press ArrowLeft twice: 105 -> 100 -> 100 (clamped)
+      fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+      expect(panel.style.width).toBe('100px');
+
+      fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+      expect(panel.style.width).toBe('100px');
+    });
+
+    it('clamps width to maxWidth on ArrowRight', () => {
+      render(
+        <ResizablePanel defaultWidth={395} minWidth={100} maxWidth={400} side="left">
+          <span>Content</span>
+        </ResizablePanel>,
+      );
+
+      const handle = screen.getByTestId('resize-handle');
+      const panel = screen.getByTestId('resizable-panel');
+
+      // Press ArrowRight twice: 395 -> 400 -> 400 (clamped)
+      fireEvent.keyDown(handle, { key: 'ArrowRight' });
+      expect(panel.style.width).toBe('400px');
+
+      fireEvent.keyDown(handle, { key: 'ArrowRight' });
+      expect(panel.style.width).toBe('400px');
+    });
+
+    it('does not change width on other keys', () => {
+      render(
+        <ResizablePanel defaultWidth={250} minWidth={100} maxWidth={400} side="left">
+          <span>Content</span>
+        </ResizablePanel>,
+      );
+
+      const handle = screen.getByTestId('resize-handle');
+      const panel = screen.getByTestId('resizable-panel');
+
+      fireEvent.keyDown(handle, { key: 'ArrowUp' });
+      expect(panel.style.width).toBe('250px');
+
+      fireEvent.keyDown(handle, { key: 'Enter' });
+      expect(panel.style.width).toBe('250px');
+    });
+  });
 });
