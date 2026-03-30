@@ -140,6 +140,30 @@ describe('ChenAttributeNode', () => {
     expect(node.className).toContain('bg-blue-100');
   });
 
+  it('underlines primary key attribute label', () => {
+    const attr = makeAttr({ name: 'id' });
+    render(
+      <ReactFlowProvider>
+        <ChenAttributeNode {...makeNodeProps(attr, { isPrimaryKey: true })} />
+      </ReactFlowProvider>,
+    );
+
+    const label = screen.getByText('id');
+    expect(label.className).toContain('underline');
+  });
+
+  it('does not underline non-primary-key attribute label', () => {
+    const attr = makeAttr({ name: 'email' });
+    render(
+      <ReactFlowProvider>
+        <ChenAttributeNode {...makeNodeProps(attr)} />
+      </ReactFlowProvider>,
+    );
+
+    const label = screen.getByText('email');
+    expect(label.className).not.toContain('underline');
+  });
+
   it('has a circle element with rounded-full class', () => {
     render(
       <ReactFlowProvider>
