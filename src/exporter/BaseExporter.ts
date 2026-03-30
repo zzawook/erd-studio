@@ -65,6 +65,7 @@ export abstract class BaseExporter implements Exporter {
         warnings.push(`Relationship "${rel.name}" has fewer than 2 participants`);
         continue;
       }
+      if (rel.isIdentifying) continue; // Already handled in weak entity logic
       if (this.isManyToMany(rel)) {
         tables.push(this.buildJunctionTable(rel, model, warnings));
       } else {
@@ -77,6 +78,7 @@ export abstract class BaseExporter implements Exporter {
     for (const rel of model.relationships) {
       if (rel.attributes.length === 0) continue;
       if (rel.participants.length < 2) continue;
+      if (rel.isIdentifying) continue;
 
       for (const attr of rel.attributes) {
         if (attr.kind === 'derived') {
@@ -89,7 +91,7 @@ export abstract class BaseExporter implements Exporter {
           const e1 = model.entities.find((e) => e.id === rel.participants[0].entityId);
           const e2 = model.entities.find((e) => e.id === rel.participants[1].entityId);
           if (e1 && e2) {
-            const jName = this.junctionTableName(e1.name, e2.name);
+            const jName = rel.name;
             const jTable = tables.find((t) => t.name === jName);
             if (jTable) {
               jTable.columns.push({
@@ -248,7 +250,7 @@ export abstract class BaseExporter implements Exporter {
               columns: ownerPk.attributeIds
                 .map((id) => owner.attributes.find((a) => a.id === id))
                 .filter((a): a is Attribute => a != null)
-                .map((a) => `${owner.name.toLowerCase()}_${a.name}`),
+                .map((a) => fkColumnName(owner.name, a.name)),
               refTable: owner.name,
               refColumns: ownerPk.attributeIds
                 .map((id) => owner.attributes.find((a) => a.id === id)?.name)
@@ -310,19 +312,27 @@ export abstract class BaseExporter implements Exporter {
     return isMany(rel.participants[0].cardinality) && isMany(rel.participants[1].cardinality);
   }
 
-  private junctionTableName(name1: string, name2: string): string {
-    return [name1, name2].sort().join('_');
-  }
-
   private buildJunctionTable(rel: Relationship, model: ERDModel, _warnings: string[]): TableDef {
     const e1 = model.entities.find((e) => e.id === rel.participants[0].entityId);
     const e2 = model.entities.find((e) => e.id === rel.participants[1].entityId);
     if (!e1 || !e2) return { name: rel.name, columns: [], primaryKey: [], uniqueConstraints: [], foreignKeys: [] };
 
-    const tableName = this.junctionTableName(e1.name, e2.name);
+    const tableName = rel.name;
     const columns: TableDef['columns'] = [];
     const pkCols: string[] = [];
     const foreignKeys: FKConstraint[] = [];
+
+    // Detect FK column name collisions across both entities
+    const allAttrNames: string[] = [];
+    for (const entity of [e1, e2]) {
+      const pk = entity.candidateKeys.find((ck) => ck.isPrimary);
+      if (!pk) continue;
+      for (const attrId of pk.attributeIds) {
+        const attr = entity.attributes.find((a) => a.id === attrId);
+        if (attr) allAttrNames.push(attr.name);
+      }
+    }
+    const hasCollision = new Set(allAttrNames).size < allAttrNames.length;
 
     for (const entity of [e1, e2]) {
       const pk = entity.candidateKeys.find((ck) => ck.isPrimary);
@@ -334,7 +344,9 @@ export abstract class BaseExporter implements Exporter {
       for (const attrId of pk.attributeIds) {
         const attr = entity.attributes.find((a) => a.id === attrId);
         if (attr) {
-          const colName = fkColumnName(entity.name, attr.name);
+          const colName = hasCollision
+            ? `${entity.name.toLowerCase()}_${attr.name}`
+            : fkColumnName(entity.name, attr.name);
           columns.push({ name: colName, type: this.mapDataType(attr.dataType), nullable: false });
           pkCols.push(colName);
           fkCols.push(colName);

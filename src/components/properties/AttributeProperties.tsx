@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useERDStore } from '../../ir/store';
 import type { Attribute, AttributeKind } from '../../ir/types';
 import { DATA_TYPE_NAMES } from '../../ir/types';
+import { IdentifyingRelationshipDialog } from '../IdentifyingRelationshipDialog';
 
 function usePartialKeyInfo(entityId?: string) {
   const model = useERDStore((s) => s.model);
@@ -22,11 +24,16 @@ interface Props {
 
 export function AttributeProperties({ attribute, entityId, relationshipId, context }: Props) {
   const pkInfo = usePartialKeyInfo(entityId);
+  const model = useERDStore((s) => s.model);
   const updateAttribute = useERDStore((s) => s.updateAttribute);
   const deleteAttribute = useERDStore((s) => s.deleteAttribute);
   const updateRelationshipAttribute = useERDStore((s) => s.updateRelationshipAttribute);
   const deleteRelationshipAttribute = useERDStore((s) => s.deleteRelationshipAttribute);
+  const updateEntity = useERDStore((s) => s.updateEntity);
+  const updateRelationship = useERDStore((s) => s.updateRelationship);
   const setSelection = useERDStore((s) => s.setSelection);
+
+  const [showRelPicker, setShowRelPicker] = useState(false);
 
   const update = (patch: Partial<Omit<Attribute, 'id'>>) => {
     if (context === 'entity' && entityId) {
@@ -46,8 +53,82 @@ export function AttributeProperties({ attribute, entityId, relationshipId, conte
     }
   };
 
+  const handlePartialKeyToggle = (checked: boolean) => {
+    if (!entityId) return;
+
+    if (checked) {
+      update({ isPartialKey: true });
+      updateEntity(entityId, { isWeak: true });
+
+      // Auto-mark identifying relationship if not already set
+      if (!pkInfo.hasIdentifying) {
+        const connectedRels = model.relationships.filter(
+          (r) => r.participants.some((p) => p.entityId === entityId)
+        );
+
+        if (connectedRels.length === 1) {
+          updateRelationship(connectedRels[0].id, { isIdentifying: true });
+        } else if (connectedRels.length > 1) {
+          setShowRelPicker(true);
+        }
+      }
+    } else {
+      update({ isPartialKey: false });
+
+      // Check if any other partial keys remain on this entity
+      const entity = model.entities.find((e) => e.id === entityId);
+      const remainingPartialKeys = entity?.attributes.filter(
+        (a) => a.isPartialKey && a.id !== attribute.id
+      ) ?? [];
+
+      if (remainingPartialKeys.length === 0) {
+        updateEntity(entityId, { isWeak: false });
+        // Un-mark any identifying relationships for this entity
+        const identRels = model.relationships.filter(
+          (r) => r.isIdentifying && r.participants.some((p) => p.entityId === entityId)
+        );
+        for (const rel of identRels) {
+          updateRelationship(rel.id, { isIdentifying: false });
+        }
+      }
+    }
+  };
+
+  const handleRelPickerSelect = (relId: string) => {
+    updateRelationship(relId, { isIdentifying: true });
+    setShowRelPicker(false);
+  };
+
+  const handleRelPickerCancel = () => {
+    // Revert: un-mark partial key and weak
+    update({ isPartialKey: false });
+    const entity = model.entities.find((e) => e.id === entityId);
+    const remainingPartialKeys = entity?.attributes.filter(
+      (a) => a.isPartialKey && a.id !== attribute.id
+    ) ?? [];
+    if (remainingPartialKeys.length === 0 && entityId) {
+      updateEntity(entityId, { isWeak: false });
+    }
+    setShowRelPicker(false);
+  };
+
   const showPrecision = attribute.dataType.name === 'VARCHAR' || attribute.dataType.name === 'NUMERIC';
   const showScale = attribute.dataType.name === 'NUMERIC';
+
+  // Build relationship options for the picker dialog
+  const relPickerOptions = entityId
+    ? model.relationships
+        .filter((r) => r.participants.some((p) => p.entityId === entityId))
+        .map((r) => {
+          const otherParticipant = r.participants.find((p) => p.entityId !== entityId);
+          const otherEntity = otherParticipant
+            ? model.entities.find((e) => e.id === otherParticipant.entityId)
+            : null;
+          return { id: r.id, name: r.name, otherEntityName: otherEntity?.name ?? '?' };
+        })
+    : [];
+
+  const entityName = entityId ? model.entities.find((e) => e.id === entityId)?.name ?? '' : '';
 
   return (
     <div className="flex flex-col gap-2" data-testid="attribute-properties">
@@ -159,23 +240,12 @@ export function AttributeProperties({ attribute, entityId, relationshipId, conte
             <input
               type="checkbox"
               checked={attribute.isPartialKey}
-              onChange={(e) => update({ isPartialKey: e.target.checked })}
-              disabled={!pkInfo.isWeak}
+              onChange={(e) => handlePartialKeyToggle(e.target.checked)}
               data-testid="attr-partial-key-checkbox"
             />
             Partial Key
           </label>
-          {!pkInfo.isWeak && (
-            <p className="text-[10px] text-gray-400 mt-0.5 ml-5">
-              Entity must be marked as "Weak Entity" first
-            </p>
-          )}
-          {pkInfo.isWeak && !pkInfo.hasIdentifying && attribute.isPartialKey && (
-            <p className="text-[10px] text-amber-500 mt-0.5 ml-5">
-              Create an identifying relationship to a dominant entity for proper rendering
-            </p>
-          )}
-          {pkInfo.isWeak && pkInfo.hasIdentifying && attribute.isPartialKey && (
+          {pkInfo.hasIdentifying && attribute.isPartialKey && (
             <p className="text-[10px] text-green-600 mt-0.5 ml-5">
               Connected to identifying relationship line
             </p>
@@ -191,6 +261,16 @@ export function AttributeProperties({ attribute, entityId, relationshipId, conte
       >
         Delete Attribute
       </button>
+
+      {/* Identifying Relationship Picker */}
+      {showRelPicker && (
+        <IdentifyingRelationshipDialog
+          entityName={entityName}
+          relationships={relPickerOptions}
+          onSelect={handleRelPickerSelect}
+          onCancel={handleRelPickerCancel}
+        />
+      )}
     </div>
   );
 }

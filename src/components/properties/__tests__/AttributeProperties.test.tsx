@@ -309,8 +309,7 @@ describe('AttributeProperties', () => {
     expect(screen.queryByTestId('attr-partial-key-checkbox')).not.toBeInTheDocument();
   });
 
-  it('toggles partial key (requires weak entity)', async () => {
-    useERDStore.getState().updateEntity(entityId, { isWeak: true });
+  it('toggling partial key ON auto-sets entity as weak', async () => {
     const user = userEvent.setup();
     render(
       <AttributeProperties
@@ -322,9 +321,17 @@ describe('AttributeProperties', () => {
 
     await user.click(screen.getByTestId('attr-partial-key-checkbox'));
     expect(getEntityAttr(entityId, attrId).isPartialKey).toBe(true);
+    expect(useERDStore.getState().model.entities.find((e) => e.id === entityId)!.isWeak).toBe(true);
   });
 
-  it('disables partial key checkbox when entity is not weak', () => {
+  it('toggling partial key ON with 1 relationship auto-marks it identifying', async () => {
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const relId = useERDStore.getState().addRelationship('owns', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+
+    const user = userEvent.setup();
     render(
       <AttributeProperties
         attribute={getEntityAttr(entityId, attrId)}
@@ -333,8 +340,235 @@ describe('AttributeProperties', () => {
       />
     );
 
-    const checkbox = screen.getByTestId('attr-partial-key-checkbox') as HTMLInputElement;
-    expect(checkbox.disabled).toBe(true);
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    expect(useERDStore.getState().model.relationships.find((r) => r.id === relId)!.isIdentifying).toBe(true);
+  });
+
+  it('toggling last partial key OFF reverts entity to non-weak', async () => {
+    // Set up: entity is weak with one partial key
+    useERDStore.getState().updateEntity(entityId, { isWeak: true });
+    useERDStore.getState().updateAttribute(entityId, attrId, { isPartialKey: true });
+
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    expect(getEntityAttr(entityId, attrId).isPartialKey).toBe(false);
+    expect(useERDStore.getState().model.entities.find((e) => e.id === entityId)!.isWeak).toBe(false);
+  });
+
+  it('shows dialog when multiple relationships exist', async () => {
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const e3 = useERDStore.getState().addEntity('C', { x: 0, y: 0 });
+    useERDStore.getState().addRelationship('r1', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    useERDStore.getState().addRelationship('r2', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e3, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    expect(screen.getByTestId('identifying-rel-dialog')).toBeInTheDocument();
+  });
+
+  it('dialog cancel reverts partial key and weak entity', async () => {
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const e3 = useERDStore.getState().addEntity('C', { x: 0, y: 0 });
+    useERDStore.getState().addRelationship('r1', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    useERDStore.getState().addRelationship('r2', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e3, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    await user.click(screen.getByTestId('identifying-rel-cancel'));
+
+    expect(getEntityAttr(entityId, attrId).isPartialKey).toBe(false);
+    expect(useERDStore.getState().model.entities.find((e) => e.id === entityId)!.isWeak).toBe(false);
+  });
+
+  it('dialog select marks chosen relationship as identifying', async () => {
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const e3 = useERDStore.getState().addEntity('C', { x: 0, y: 0 });
+    const relId1 = useERDStore.getState().addRelationship('r1', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    useERDStore.getState().addRelationship('r2', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e3, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    await user.click(screen.getByTestId(`rel-option-${relId1}`));
+
+    expect(screen.queryByTestId('identifying-rel-dialog')).not.toBeInTheDocument();
+    expect(useERDStore.getState().model.relationships.find((r) => r.id === relId1)!.isIdentifying).toBe(true);
+  });
+
+  it('does not show dialog when entity has no relationships', async () => {
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    expect(screen.queryByTestId('identifying-rel-dialog')).not.toBeInTheDocument();
+    expect(useERDStore.getState().model.entities.find((e) => e.id === entityId)!.isWeak).toBe(true);
+  });
+
+  it('does not auto-mark identifying when one already exists', async () => {
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const relId = useERDStore.getState().addRelationship('r1', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    useERDStore.getState().updateRelationship(relId, { isIdentifying: true });
+
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    // Should still be identifying (not toggled off)
+    expect(useERDStore.getState().model.relationships.find((r) => r.id === relId)!.isIdentifying).toBe(true);
+  });
+
+  it('dialog cancel keeps entity weak if other partial keys remain', async () => {
+    const attr2Id = useERDStore.getState().addAttribute(entityId, 'col2', { name: 'INT' });
+    useERDStore.getState().updateEntity(entityId, { isWeak: true });
+    useERDStore.getState().updateAttribute(entityId, attr2Id, { isPartialKey: true });
+
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const e3 = useERDStore.getState().addEntity('C', { x: 0, y: 0 });
+    useERDStore.getState().addRelationship('r1', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    useERDStore.getState().addRelationship('r2', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e3, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    await user.click(screen.getByTestId('identifying-rel-cancel'));
+
+    // Entity stays weak because col2 is still a partial key
+    expect(useERDStore.getState().model.entities.find((e) => e.id === entityId)!.isWeak).toBe(true);
+  });
+
+  it('shows connected message when identifying relationship exists', async () => {
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const relId = useERDStore.getState().addRelationship('r1', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    useERDStore.getState().updateEntity(entityId, { isWeak: true });
+    useERDStore.getState().updateAttribute(entityId, attrId, { isPartialKey: true });
+    useERDStore.getState().updateRelationship(relId, { isIdentifying: true });
+
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    expect(screen.getByText('Connected to identifying relationship line')).toBeInTheDocument();
+  });
+
+  it('toggling last partial key OFF un-marks identifying relationship', async () => {
+    const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
+    const relId = useERDStore.getState().addRelationship('r1', [
+      { entityId, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    useERDStore.getState().updateEntity(entityId, { isWeak: true });
+    useERDStore.getState().updateAttribute(entityId, attrId, { isPartialKey: true });
+    useERDStore.getState().updateRelationship(relId, { isIdentifying: true });
+
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        entityId={entityId}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    expect(useERDStore.getState().model.relationships.find((r) => r.id === relId)!.isIdentifying).toBe(false);
+  });
+
+  it('partial key toggle is a no-op without entityId', async () => {
+    const user = userEvent.setup();
+    render(
+      <AttributeProperties
+        attribute={getEntityAttr(entityId, attrId)}
+        context="entity"
+      />
+    );
+
+    await user.click(screen.getByTestId('attr-partial-key-checkbox'));
+    // Should not crash, attribute unchanged since no entityId
+    expect(getEntityAttr(entityId, attrId).isPartialKey).toBe(false);
   });
 
   // -----------------------------------------------------------------------

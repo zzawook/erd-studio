@@ -222,7 +222,7 @@ describe('MySQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('CREATE TABLE `Course_Student`');
+    expect(result.ddl).toContain('CREATE TABLE `enrolls`');
     expect(result.ddl).toContain('`student_id` INT NOT NULL');
     expect(result.ddl).toContain('`course_id` INT NOT NULL');
   });
@@ -266,6 +266,6 @@ describe('MySQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('FOREIGN KEY (`dept_id`) REFERENCES `Dept` (`id`)');
+    expect(result.ddl).toContain('FOREIGN KEY (`id`) REFERENCES `Dept` (`id`)');
   });
 });

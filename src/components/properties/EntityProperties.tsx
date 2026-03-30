@@ -35,17 +35,6 @@ export function EntityProperties({ entity }: Props) {
         />
       </div>
 
-      {/* Is Weak */}
-      <label className="flex items-center gap-1.5 text-gray-600">
-        <input
-          type="checkbox"
-          checked={entity.isWeak}
-          onChange={(e) => updateEntity(entity.id, { isWeak: e.target.checked })}
-          data-testid="entity-weak-checkbox"
-        />
-        Weak Entity
-      </label>
-
       {/* Attributes */}
       <div>
         <h4 className="font-bold text-gray-700 mb-1">Attributes</h4>

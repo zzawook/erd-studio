@@ -228,7 +228,7 @@ describe('CrowsFootRenderer', () => {
     // Employee (many side) should have FK referencing Department
     const employeeNode = nodes.find((n) => n.id === 'entity::e2');
     expect(employeeNode?.data.foreignKeys).toHaveLength(1);
-    expect(employeeNode?.data.foreignKeys[0].attributeName).toBe('department_dept_id');
+    expect(employeeNode?.data.foreignKeys[0].attributeName).toBe('dept_id');
     expect(employeeNode?.data.foreignKeys[0].referencedEntityName).toBe('Department');
 
     // Department (one side) should have no FKs
@@ -591,7 +591,7 @@ describe('CrowsFootRenderer', () => {
     // Child (many side) should have FK for the existing attribute only
     const childNode = nodes.find((n) => n.id === 'entity::e2');
     expect(childNode?.data.foreignKeys).toHaveLength(1);
-    expect(childNode?.data.foreignKeys[0].attributeName).toBe('parent_pid');
+    expect(childNode?.data.foreignKeys[0].attributeName).toBe('pid');
   });
 
   // -----------------------------------------------------------------------
@@ -630,7 +630,7 @@ describe('CrowsFootRenderer', () => {
     // Goo (optional side, min=0) gets FK; only the valid attr should create an FK
     const gooNode = nodes.find((n) => n.id === 'entity::e2');
     expect(gooNode?.data.foreignKeys).toHaveLength(1);
-    expect(gooNode?.data.foreignKeys[0].attributeName).toBe('foo_fid');
+    expect(gooNode?.data.foreignKeys[0].attributeName).toBe('fid');
   });
 
   // -----------------------------------------------------------------------
