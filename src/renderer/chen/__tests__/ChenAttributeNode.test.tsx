@@ -140,7 +140,7 @@ describe('ChenAttributeNode', () => {
     expect(node.className).toContain('bg-primary-50');
   });
 
-  it('underlines primary key attribute label', () => {
+  it('shows filled circle for primary key attribute', () => {
     const attr = makeAttr({ name: 'id' });
     render(
       <ReactFlowProvider>
@@ -148,8 +148,8 @@ describe('ChenAttributeNode', () => {
       </ReactFlowProvider>,
     );
 
-    const label = screen.getByText('id');
-    expect(label.className).toContain('underline');
+    const circle = screen.getByTestId('attr-circle');
+    expect(circle.className).toContain('bg-primary-600');
   });
 
   it('does not underline non-primary-key attribute label', () => {
