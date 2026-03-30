@@ -743,6 +743,119 @@ describe('CrowsFootRenderer', () => {
     expect(aggNode?.position).toEqual({ x: 300, y: 300 });
   });
 
+  // -----------------------------------------------------------------------
+  // Edge handle assignment based on relative entity positions
+  // -----------------------------------------------------------------------
+  it('assigns right-src/left handles for horizontally arranged entities', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'A', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'B', position: { x: 300, y: 0 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Rel',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { edges } = crowsFootRenderer.render(model);
+    expect(edges[0].sourceHandle).toBe('right-src');
+    expect(edges[0].targetHandle).toBe('left');
+  });
+
+  it('assigns bottom-src/top handles for vertically arranged entities', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'A', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'B', position: { x: 0, y: 300 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Rel',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { edges } = crowsFootRenderer.render(model);
+    expect(edges[0].sourceHandle).toBe('bottom-src');
+    expect(edges[0].targetHandle).toBe('top');
+  });
+
+  it('assigns left-src/right handles when target is to the left of source', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'A', position: { x: 300, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'B', position: { x: 0, y: 0 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Rel',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { edges } = crowsFootRenderer.render(model);
+    expect(edges[0].sourceHandle).toBe('left-src');
+    expect(edges[0].targetHandle).toBe('right');
+  });
+
+  it('assigns handles for aggregation virtual entity edges', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'Student', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'Course', position: { x: 300, y: 0 } }),
+        makeEntity({ id: 'e3', name: 'Professor', position: { x: 150, y: 300 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Enrolls',
+          position: { x: 150, y: 0 },
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+        }),
+        makeRelationship({
+          id: 'r2',
+          name: 'Monitors',
+          position: { x: 150, y: 200 },
+          participants: [
+            { entityId: 'agg1', cardinality: { min: 1, max: 1 }, isAggregation: true },
+            { entityId: 'e3', cardinality: { min: 0, max: '*' } },
+          ],
+        }),
+      ],
+      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1' }],
+    };
+
+    const { edges } = crowsFootRenderer.render(model);
+    const monitorEdge = edges.find((e) => e.id === 'edge::r2');
+    expect(monitorEdge).toBeDefined();
+    // agg1 position is (150, 150), e3 is (150, 300) → vertical, target below
+    expect(monitorEdge?.sourceHandle).toBe('bottom-src');
+    expect(monitorEdge?.targetHandle).toBe('top');
+  });
+
   it('creates edge connecting aggregation virtual entity to another entity', () => {
     const model: ERDModel = {
       entities: [
