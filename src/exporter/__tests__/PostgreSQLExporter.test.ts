@@ -254,10 +254,10 @@ describe('PostgreSQLExporter', () => {
   });
 
   // -----------------------------------------------------------------------
-  // One-to-many → FK on many side
+  // One-to-many → FK on max-1 side
   // -----------------------------------------------------------------------
 
-  it('adds FK on the many side for 1:N relationship', () => {
+  it('adds FK on the max-1 side for 1:N relationship', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({
@@ -278,8 +278,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'works_in',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -298,10 +298,10 @@ describe('PostgreSQLExporter', () => {
   });
 
   // -----------------------------------------------------------------------
-  // One-to-one → FK on optional side
+  // One-to-one → FK on max-1 side
   // -----------------------------------------------------------------------
 
-  it('adds FK on the optional side for 1:1 relationship', () => {
+  it('adds FK on the max-1 side for 1:1 relationship and merges with total participation', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({
@@ -322,8 +322,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'has_passport',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -333,16 +333,17 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    // Passport (optional side, min=0) should get the FK
-    const passportTable = result.ddl.split('CREATE TABLE "Passport"')[1];
+    // Passport has max=1 → FK side; Passport min=1 → total participation → merge
+    const passportTable = result.ddl.split('CREATE TABLE "Passport_has_passport"')[1];
     expect(passportTable).toContain('FOREIGN KEY ("id") REFERENCES "Person" ("id")');
+    expect(passportTable).toContain('"id" INTEGER NOT NULL');
   });
 
   // -----------------------------------------------------------------------
-  // 1:1 both mandatory → alphabetical fallback
+  // 1:1 both optional → alphabetical fallback
   // -----------------------------------------------------------------------
 
-  it('places FK on alphabetically later entity for 1:1 both mandatory', () => {
+  it('places FK on alphabetically later entity for 1:1 both optional', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({
@@ -363,8 +364,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'rel',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -551,10 +552,10 @@ describe('PostgreSQLExporter', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Relationship attributes on 1:N → columns on many-side table
+  // Relationship attributes on 1:N → columns on max-1 side table
   // -----------------------------------------------------------------------
 
-  it('adds relationship attributes to many-side table for 1:N', () => {
+  it('adds relationship attributes to max-1 side table for 1:N', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({
@@ -575,8 +576,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'works_in',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [
@@ -653,8 +654,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'manages',
           participants: [
-            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
             { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -718,8 +719,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'rel',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [
@@ -873,8 +874,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'has',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -966,8 +967,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'rel',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1086,8 +1087,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'rel',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1102,10 +1103,10 @@ describe('PostgreSQLExporter', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 1:N where first participant is many
+  // 1:N where first participant is the max-1 side
   // -----------------------------------------------------------------------
 
-  it('handles 1:N where first participant is the many side', () => {
+  it('handles 1:N where first participant is the max-1 side', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({
@@ -1126,8 +1127,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'places',
           participants: [
-            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1162,8 +1163,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'places',
           participants: [
-            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1203,8 +1204,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'places',
           participants: [
-            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1227,7 +1228,7 @@ describe('PostgreSQLExporter', () => {
   // 1:1 with second side optional
   // -----------------------------------------------------------------------
 
-  it('handles 1:1 where second side is optional', () => {
+  it('handles 1:1 where second side is optional and merges with total participation', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({
@@ -1248,8 +1249,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'rel',
           participants: [
-            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1259,9 +1260,10 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    // e1 has min=0, so it should get the FK
-    const aTable = result.ddl.split('CREATE TABLE "A"')[1];
+    // A has min=1 → total participation; both max=1, A (min=1) gets FK → merge
+    const aTable = result.ddl.split('CREATE TABLE "A_rel"')[1];
     expect(aTable).toContain('FOREIGN KEY ("id") REFERENCES "B" ("id")');
+    expect(aTable).toContain('"id" INTEGER NOT NULL');
   });
 
   // -----------------------------------------------------------------------
@@ -1320,8 +1322,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'rel1',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1331,8 +1333,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r2',
           name: 'rel2',
           participants: [
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1409,8 +1411,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'rel',
           participants: [
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1710,8 +1712,8 @@ describe('PostgreSQLExporter', () => {
           id: 'r1',
           name: 'R',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
@@ -1889,24 +1891,24 @@ describe('PostgreSQLExporter', () => {
         {
           id: 'r1', name: 'r1',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
         },
         {
           id: 'r2', name: 'r2',
           participants: [
-            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e3', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
         },
         {
           id: 'r3', name: 'r3',
           participants: [
-            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
         },
@@ -1918,6 +1920,1457 @@ describe('PostgreSQLExporter', () => {
     expect(result.ddl).toContain('CREATE TABLE "A"');
     expect(result.ddl).toContain('CREATE TABLE "B"');
     expect(result.ddl).toContain('CREATE TABLE "C"');
+    expect(result.ddl).toContain('FOREIGN KEY');
+  });
+
+  // -----------------------------------------------------------------------
+  // Total participation → table merge (entity_relationship naming)
+  // -----------------------------------------------------------------------
+
+  it('merges entity with relationship table for 1:N with total participation', () => {
+    // Scenario from issue #7: customers owns games
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'customers',
+          attributes: [makeAttr({ id: 'a1', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'games',
+          attributes: [makeAttr({ id: 'a2', name: 'gid', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'owns',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // customers has max=1 → FK side; customers min=1 → total participation → merge
+    expect(result.ddl).toContain('CREATE TABLE "customers_owns"');
+    expect(result.ddl).not.toContain('CREATE TABLE "customers" (');
+    // FK column should be NOT NULL due to total participation
+    const mergedTable = result.ddl.split('CREATE TABLE "customers_owns"')[1];
+    expect(mergedTable).toContain('"cid" INTEGER NOT NULL');
+    expect(mergedTable).toContain('"gid" VARCHAR(255) NOT NULL');
+    expect(mergedTable).toContain('PRIMARY KEY ("cid")');
+    expect(mergedTable).toContain('FOREIGN KEY ("gid") REFERENCES "games" ("gid")');
+    // games table should be separate and unchanged
+    expect(result.ddl).toContain('CREATE TABLE "games"');
+  });
+
+  it('does NOT merge when partial participation (other side min=0)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Department',
+          attributes: [makeAttr({ id: 'a1', name: 'dept_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a2', name: 'emp_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'works_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // No merge: Employee has max=1 → FK side; Employee min=0 → partial participation
+    expect(result.ddl).toContain('CREATE TABLE "Employee"');
+    expect(result.ddl).not.toContain('CREATE TABLE "Employee_works_in"');
+    // FK column should be nullable
+    const empTable = result.ddl.split('CREATE TABLE "Employee"')[1];
+    expect(empTable).toContain('"dept_id" INTEGER');
+    expect(empTable).not.toContain('"dept_id" INTEGER NOT NULL');
+  });
+
+  it('merges 1:1 relationship with total participation on FK side', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Person',
+          attributes: [makeAttr({ id: 'a1', name: 'pid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'License',
+          attributes: [makeAttr({ id: 'a2', name: 'lid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'holds',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // License has max=1 and min=1 → FK side with total participation → merge
+    expect(result.ddl).toContain('CREATE TABLE "License_holds"');
+    expect(result.ddl).not.toContain('CREATE TABLE "License" (');
+    const licTable = result.ddl.split('CREATE TABLE "License_holds"')[1];
+    expect(licTable).toContain('"pid" INTEGER NOT NULL');
+    expect(licTable).toContain('FOREIGN KEY ("pid") REFERENCES "Person" ("pid")');
+  });
+
+  it('does NOT merge self-referencing relationships', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'manages',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Self-referencing should NOT merge
+    expect(result.ddl).toContain('CREATE TABLE "Employee"');
+    expect(result.ddl).not.toContain('CREATE TABLE "Employee_manages"');
+    expect(result.ddl).toContain('"ref_id" INTEGER');
+  });
+
+  it('makes FK columns NOT NULL when merging due to total participation', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Advisor',
+          attributes: [makeAttr({ id: 'a2', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'advised_by',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Student has max=1 → FK side; Student min=1 → total participation → merge
+    expect(result.ddl).toContain('CREATE TABLE "Student_advised_by"');
+    const studentTable = result.ddl.split('CREATE TABLE "Student_advised_by"')[1];
+    // FK column "aid" should be NOT NULL
+    expect(studentTable).toContain('"aid" INTEGER NOT NULL');
+  });
+
+  it('keeps FK columns nullable when no total participation', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Advisor',
+          attributes: [makeAttr({ id: 'a2', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'advised_by',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // No merge: Student has max=1 → FK side; Student min=0 → partial participation
+    expect(result.ddl).toContain('CREATE TABLE "Student"');
+    const studentTable = result.ddl.split('CREATE TABLE "Student"')[1];
+    // FK column "aid" should be nullable (no NOT NULL)
+    expect(studentTable).toContain('"aid" INTEGER');
+    expect(studentTable).not.toContain('"aid" INTEGER NOT NULL');
+  });
+
+  it('merges with relationship attributes included in merged table', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a1', name: 'eid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Department',
+          attributes: [makeAttr({ id: 'a2', name: 'did', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'works_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [
+            makeAttr({ id: 'ra1', name: 'start_date', dataType: { name: 'DATE' }, nullable: true }),
+            makeAttr({ id: 'ra2', name: 'role', dataType: { name: 'VARCHAR', precision: 50 }, nullable: true }),
+          ],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Employee gets merged with works_in
+    expect(result.ddl).toContain('CREATE TABLE "Employee_works_in"');
+    const empTable = result.ddl.split('CREATE TABLE "Employee_works_in"')[1];
+    // Relationship attributes should be in the merged table
+    expect(empTable).toContain('"start_date" DATE');
+    expect(empTable).toContain('"role" VARCHAR(50)');
+    // FK should be NOT NULL
+    expect(empTable).toContain('"did" INTEGER NOT NULL');
+    expect(empTable).toContain('FOREIGN KEY ("did") REFERENCES "Department" ("did")');
+  });
+
+  it('merges with composite PK on referenced entity', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Order',
+          attributes: [makeAttr({ id: 'a1', name: 'oid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Product',
+          attributes: [
+            makeAttr({ id: 'a2', name: 'brand', dataType: { name: 'VARCHAR', precision: 50 }, nullable: false }),
+            makeAttr({ id: 'a3', name: 'sku', dataType: { name: 'VARCHAR', precision: 20 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a2', 'a3'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'contains',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Order has max=1 → FK side; Order min=1 → total participation → merge
+    expect(result.ddl).toContain('CREATE TABLE "Order_contains"');
+    const orderTable = result.ddl.split('CREATE TABLE "Order_contains"')[1];
+    expect(orderTable).toContain('"brand" VARCHAR(50) NOT NULL');
+    expect(orderTable).toContain('"sku" VARCHAR(20) NOT NULL');
+    expect(orderTable).toContain('FOREIGN KEY ("brand", "sku") REFERENCES "Product" ("brand", "sku")');
+  });
+
+  it('updates FK references when merged table is referenced by other tables', () => {
+    // A is referenced by B; A gets merged → B's FK should point to new name
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Parent',
+          attributes: [makeAttr({ id: 'a1', name: 'pid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Child',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+        makeEntity({
+          id: 'e3',
+          name: 'Grandchild',
+          attributes: [makeAttr({ id: 'a3', name: 'gid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has_child',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'has_grandchild',
+          participants: [
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Child is NOT merged (Child has max=1 → FK side, but min=0 → partial participation)
+    // Grandchild IS merged (Grandchild has max=1 → FK side, min=1 → total participation)
+    expect(result.ddl).toContain('CREATE TABLE "Child"');
+    expect(result.ddl).toContain('CREATE TABLE "Grandchild_has_grandchild"');
+    // Grandchild's FK should reference Child (not renamed)
+    const gcTable = result.ddl.split('CREATE TABLE "Grandchild_has_grandchild"')[1];
+    expect(gcTable).toContain('FOREIGN KEY ("cid") REFERENCES "Child" ("cid")');
+  });
+
+  it('updates FK references pointing to a merged table', () => {
+    // Product gets merged; Supplier also references Product via 1:N → FK on Product should use new name
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Category',
+          attributes: [makeAttr({ id: 'a1', name: 'cat_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Product',
+          attributes: [makeAttr({ id: 'a2', name: 'prod_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+        makeEntity({
+          id: 'e3',
+          name: 'Supplier',
+          attributes: [makeAttr({ id: 'a3', name: 'sup_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'belongs_to',
+          participants: [
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'supplies',
+          participants: [
+            { entityId: 'e3', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Product merged with belongs_to (Product has max=1, min=1 → total participation)
+    expect(result.ddl).toContain('CREATE TABLE "Product_belongs_to"');
+    // Product (now Product_belongs_to) has FK to Category AND FK to Supplier
+    const prodTable = result.ddl.split('CREATE TABLE "Product_belongs_to"')[1];
+    expect(prodTable).toContain('FOREIGN KEY ("cat_id") REFERENCES "Category" ("cat_id")');
+    expect(prodTable).toContain('FOREIGN KEY ("sup_id") REFERENCES "Supplier" ("sup_id")');
+  });
+
+  it('handles multiple merge candidates on same entity (uses first relationship)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Advisor',
+          attributes: [makeAttr({ id: 'a2', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+        makeEntity({
+          id: 'e3',
+          name: 'Department',
+          attributes: [makeAttr({ id: 'a3', name: 'did', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'advised_by',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'enrolled_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e3', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Student has max=1 and min=1 in both; qualifies for merge with both; first (advised_by) wins
+    expect(result.ddl).toContain('CREATE TABLE "Student_advised_by"');
+    expect(result.ddl).not.toContain('CREATE TABLE "Student_enrolled_in"');
+    expect(result.ddl).not.toContain('CREATE TABLE "Student" (');
+    // Both FK columns should be NOT NULL
+    const studentTable = result.ddl.split('CREATE TABLE "Student_advised_by"')[1];
+    expect(studentTable).toContain('"aid" INTEGER NOT NULL');
+    expect(studentTable).toContain('"did" INTEGER NOT NULL');
+  });
+
+  it('merges 1:1 both mandatory and renames FK side table', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Alpha',
+          attributes: [makeAttr({ id: 'a1', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Beta',
+          attributes: [makeAttr({ id: 'a2', name: 'bid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'linked',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Both mandatory: FK on alphabetically later (Beta); Alpha min=1 → total participation → merge
+    expect(result.ddl).toContain('CREATE TABLE "Beta_linked"');
+    expect(result.ddl).not.toContain('CREATE TABLE "Beta" (');
+    const betaTable = result.ddl.split('CREATE TABLE "Beta_linked"')[1];
+    expect(betaTable).toContain('"aid" INTEGER NOT NULL');
+    expect(betaTable).toContain('FOREIGN KEY ("aid") REFERENCES "Alpha" ("aid")');
+  });
+
+  it('does NOT merge for M:N relationships (junction table created instead)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'enrolls',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // M:N with total participation on both sides → still junction table, no merge
+    expect(result.ddl).toContain('CREATE TABLE "Student"');
+    expect(result.ddl).toContain('CREATE TABLE "Course"');
+    expect(result.ddl).toContain('CREATE TABLE "enrolls"');
+    expect(result.ddl).not.toContain('Student_enrolls');
+    expect(result.ddl).not.toContain('Course_enrolls');
+  });
+
+  it('does NOT merge identifying relationships (handled by weak entity logic)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Building',
+          attributes: [makeAttr({ id: 'a1', name: 'bid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Room',
+          isWeak: true,
+          attributes: [makeAttr({ id: 'a2', name: 'rnum', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Identifying relationships are skipped by merge logic
+    expect(result.ddl).toContain('CREATE TABLE "Room"');
+    expect(result.ddl).not.toContain('Room_has');
+  });
+
+  it('merges with numeric max > 1 on other side and total participation on FK side', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Task',
+          attributes: [makeAttr({ id: 'a1', name: 'tid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Worker',
+          attributes: [makeAttr({ id: 'a2', name: 'wid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'assigned_to',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 5 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Task has max=1 → FK side; Task min=1 → total participation → merge
+    expect(result.ddl).toContain('CREATE TABLE "Task_assigned_to"');
+    const taskTable = result.ddl.split('CREATE TABLE "Task_assigned_to"')[1];
+    expect(taskTable).toContain('"wid" INTEGER NOT NULL');
+    expect(taskTable).toContain('FOREIGN KEY ("wid") REFERENCES "Worker" ("wid")');
+  });
+
+  it('preserves topological sort order with merged tables', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Dept',
+          attributes: [makeAttr({ id: 'a1', name: 'did', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Emp',
+          attributes: [makeAttr({ id: 'a2', name: 'eid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'works_in',
+          participants: [
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Dept should come before Emp_works_in (Emp has max=1 → FK side, min=1 → merge)
+    const deptPos = result.ddl.indexOf('CREATE TABLE "Dept"');
+    const empPos = result.ddl.indexOf('CREATE TABLE "Emp_works_in"');
+    expect(deptPos).toBeLessThan(empPos);
+  });
+
+  it('handles merge when FK column collides with existing entity column', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Order',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a3', name: 'note', dataType: { name: 'TEXT' } }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Customer',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'places',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Order has max=1 → FK side, min=1 → merge; FK column "id" collides with Order's "id"
+    expect(result.ddl).toContain('CREATE TABLE "Order_places"');
+    const orderTable = result.ddl.split('CREATE TABLE "Order_places"')[1];
+    expect(orderTable).toContain('FOREIGN KEY ("id") REFERENCES "Customer" ("id")');
+  });
+
+  it('handles merge with multivalued attribute table referencing merged entity', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Person',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'pid', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a3', name: 'phone', dataType: { name: 'VARCHAR', precision: 20 }, kind: 'multivalued' }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Company',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'works_at',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Person has max=1 → FK side, min=1 → merge → Person_works_at
+    expect(result.ddl).toContain('CREATE TABLE "Person_works_at"');
+    expect(result.ddl).toContain('CREATE TABLE "Person_phone"');
+    // The multivalued table's FK should reference the merged name
+    const phoneTable = result.ddl.split('CREATE TABLE "Person_phone"')[1];
+    expect(phoneTable).toContain('FOREIGN KEY ("pid") REFERENCES "Person_works_at" ("pid")');
+  });
+
+  // -----------------------------------------------------------------------
+  // Self-referencing edge cases with total participation
+  // -----------------------------------------------------------------------
+
+  it('does NOT merge self-referencing relationship even with total participation cardinality', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a1', name: 'eid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'manages',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('CREATE TABLE "Employee"');
+    expect(result.ddl).not.toContain('Employee_manages');
+    expect(result.ddl).toContain('"ref_eid" INTEGER');
+    expect(result.ddl).toContain('FOREIGN KEY ("ref_eid") REFERENCES "Employee" ("eid")');
+  });
+
+  it('handles self-referencing with composite PK', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Node',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'ns', dataType: { name: 'VARCHAR', precision: 50 }, nullable: false }),
+            makeAttr({ id: 'a2', name: 'key', dataType: { name: 'VARCHAR', precision: 50 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1', 'a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'parent',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('"ref_ns" VARCHAR(50)');
+    expect(result.ddl).toContain('"ref_key" VARCHAR(50)');
+    expect(result.ddl).toContain('FOREIGN KEY ("ref_ns", "ref_key") REFERENCES "Node" ("ns", "key")');
+  });
+
+  // -----------------------------------------------------------------------
+  // Merged table referenced by multiple other tables
+  // -----------------------------------------------------------------------
+
+  it('updates FK references in multiple tables when a merged table is referenced', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Author',
+          attributes: [makeAttr({ id: 'a1', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'], 'pk1')],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Publisher',
+          attributes: [makeAttr({ id: 'a2', name: 'pub_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+        makeEntity({
+          id: 'e3',
+          name: 'Review',
+          attributes: [makeAttr({ id: 'a3', name: 'rid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'], 'pk3')],
+        }),
+        makeEntity({
+          id: 'e4',
+          name: 'Award',
+          attributes: [makeAttr({ id: 'a4', name: 'awid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a4'], 'pk4')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'published_by',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'reviews',
+          participants: [
+            { entityId: 'e3', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r3',
+          name: 'wins',
+          participants: [
+            { entityId: 'e4', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Author merged (min=1, max=1 → FK side with total participation)
+    expect(result.ddl).toContain('CREATE TABLE "Author_published_by"');
+    // Review and Award both reference Author → should now reference Author_published_by
+    const reviewTable = result.ddl.split('CREATE TABLE "Review"')[1];
+    expect(reviewTable).toContain('FOREIGN KEY ("aid") REFERENCES "Author_published_by" ("aid")');
+    const awardTable = result.ddl.split('CREATE TABLE "Award"')[1];
+    expect(awardTable).toContain('FOREIGN KEY ("aid") REFERENCES "Author_published_by" ("aid")');
+  });
+
+  // -----------------------------------------------------------------------
+  // Junction table with PK attribute collision
+  // -----------------------------------------------------------------------
+
+  it('prefixes junction table FK columns when both entities share PK attribute names', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Teacher',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'teaches',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('CREATE TABLE "teaches"');
+    // Both have "id" PK → collision detected → prefixed with entity name
+    const junctionTable = result.ddl.split('CREATE TABLE "teaches"')[1];
+    expect(junctionTable).toContain('"teacher_id" INTEGER NOT NULL');
+    expect(junctionTable).toContain('"student_id" INTEGER NOT NULL');
+    expect(junctionTable).toContain('FOREIGN KEY ("teacher_id") REFERENCES "Teacher" ("id")');
+    expect(junctionTable).toContain('FOREIGN KEY ("student_id") REFERENCES "Student" ("id")');
+  });
+
+  // -----------------------------------------------------------------------
+  // Deferred FK via ALTER TABLE for cyclic references
+  // -----------------------------------------------------------------------
+
+  it('generates ALTER TABLE for deferred FKs in cyclic dependencies', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Chicken',
+          attributes: [makeAttr({ id: 'a1', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'], 'pk1')],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Egg',
+          attributes: [makeAttr({ id: 'a2', name: 'eid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'lays',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'hatches',
+          participants: [
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Both tables created with their FK constraints despite cycle
+    expect(result.ddl).toContain('CREATE TABLE "Chicken"');
+    expect(result.ddl).toContain('CREATE TABLE "Egg"');
+    const eggTable = result.ddl.split('CREATE TABLE "Egg"')[1];
+    expect(eggTable).toContain('FOREIGN KEY ("cid") REFERENCES "Chicken" ("cid")');
+    const chickenTable = result.ddl.split('CREATE TABLE "Chicken"')[1];
+    expect(chickenTable).toContain('FOREIGN KEY ("eid") REFERENCES "Egg" ("eid")');
+  });
+
+  // -----------------------------------------------------------------------
+  // Relationship attributes on identifying relationship are skipped
+  // -----------------------------------------------------------------------
+
+  it('skips relationship attributes on identifying relationships', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Owner',
+          attributes: [makeAttr({ id: 'a1', name: 'oid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Dep',
+          isWeak: true,
+          attributes: [makeAttr({ id: 'a2', name: 'seq', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'owns',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: true,
+          attributes: [
+            makeAttr({ id: 'ra1', name: 'since', dataType: { name: 'DATE' } }),
+          ],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Identifying relationship attributes are skipped
+    expect(result.ddl).not.toContain('"since"');
+  });
+
+  // -----------------------------------------------------------------------
+  // 1:N with no merge and partial participation → nullable FK
+  // -----------------------------------------------------------------------
+
+  it('produces nullable FK for 1:N with partial participation (min=0 on FK side)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Car',
+          attributes: [makeAttr({ id: 'a1', name: 'vin', dataType: { name: 'VARCHAR', precision: 17 }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Garage',
+          attributes: [makeAttr({ id: 'a2', name: 'gid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'parked_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Car has max=1 → FK side. Car has min=0 → partial participation → no merge, FK nullable
+    expect(result.ddl).toContain('CREATE TABLE "Car"');
+    expect(result.ddl).not.toContain('Car_parked_in');
+    const carTable = result.ddl.split('CREATE TABLE "Car"')[1];
+    expect(carTable).toContain('"gid" INTEGER');
+    expect(carTable).not.toContain('"gid" INTEGER NOT NULL');
+    expect(carTable).toContain('FOREIGN KEY ("gid") REFERENCES "Garage" ("gid")');
+  });
+
+  // -----------------------------------------------------------------------
+  // 1:N with total participation → NOT NULL FK + merge
+  // -----------------------------------------------------------------------
+
+  it('produces NOT NULL FK for 1:N with total participation (min=1 on FK side)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Car',
+          attributes: [makeAttr({ id: 'a1', name: 'vin', dataType: { name: 'VARCHAR', precision: 17 }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Garage',
+          attributes: [makeAttr({ id: 'a2', name: 'gid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'parked_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Car has max=1 → FK side. Car has min=1 → total participation → merge + NOT NULL FK
+    expect(result.ddl).toContain('CREATE TABLE "Car_parked_in"');
+    expect(result.ddl).not.toContain('CREATE TABLE "Car" (');
+    const carTable = result.ddl.split('CREATE TABLE "Car_parked_in"')[1];
+    expect(carTable).toContain('"gid" INTEGER NOT NULL');
+    expect(carTable).toContain('FOREIGN KEY ("gid") REFERENCES "Garage" ("gid")');
+  });
+
+  // -----------------------------------------------------------------------
+  // Entity with no relationships (disconnected)
+  // -----------------------------------------------------------------------
+
+  it('handles entities with no relationships (disconnected)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Standalone',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Also_Alone',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('CREATE TABLE "Standalone"');
+    expect(result.ddl).toContain('CREATE TABLE "Also_Alone"');
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  // -----------------------------------------------------------------------
+  // Mixed: some relationships with merge, some without
+  // -----------------------------------------------------------------------
+
+  it('correctly handles mix of merged and non-merged relationships on different entities', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'], 'pk1')],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Advisor',
+          attributes: [makeAttr({ id: 'a2', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+        makeEntity({
+          id: 'e3',
+          name: 'Library',
+          attributes: [makeAttr({ id: 'a3', name: 'lid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'], 'pk3')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'advised_by',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'uses',
+          participants: [
+            { entityId: 'e3', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Student merged (min=1, total participation in advised_by)
+    expect(result.ddl).toContain('CREATE TABLE "Student_advised_by"');
+    // Library NOT merged (min=0, partial participation in uses)
+    expect(result.ddl).toContain('CREATE TABLE "Library"');
+    expect(result.ddl).not.toContain('Library_uses');
+    // Library FK should be nullable
+    const libTable = result.ddl.split('CREATE TABLE "Library"')[1];
+    expect(libTable).toContain('"sid" INTEGER');
+    expect(libTable).not.toContain('"sid" INTEGER NOT NULL');
+    // Library's FK should reference the merged Student table name
+    expect(libTable).toContain('FOREIGN KEY ("sid") REFERENCES "Student_advised_by" ("sid")');
+  });
+
+  // -----------------------------------------------------------------------
+  // M:N with total participation on both sides → no merge, junction table
+  // -----------------------------------------------------------------------
+
+  it('creates junction table for M:N even when min >= 1 on both sides', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Doctor',
+          attributes: [makeAttr({ id: 'a1', name: 'did', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Patient',
+          attributes: [makeAttr({ id: 'a2', name: 'pid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'treats',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('CREATE TABLE "Doctor"');
+    expect(result.ddl).toContain('CREATE TABLE "Patient"');
+    expect(result.ddl).toContain('CREATE TABLE "treats"');
+    expect(result.ddl).not.toContain('Doctor_treats');
+    expect(result.ddl).not.toContain('Patient_treats');
+  });
+
+  // -----------------------------------------------------------------------
+  // 1:1 both mandatory → merge on alphabetical FK side
+  // -----------------------------------------------------------------------
+
+  it('merges 1:1 both mandatory with total participation', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a1', name: 'eid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Badge',
+          attributes: [makeAttr({ id: 'a2', name: 'bid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has_badge',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Both mandatory, 1:1 → alphabetical: "Employee" > "Badge" → Employee gets FK
+    // Employee min=1 → total participation → merge
+    expect(result.ddl).toContain('CREATE TABLE "Employee_has_badge"');
+    expect(result.ddl).not.toContain('CREATE TABLE "Employee" (');
+    const empTable = result.ddl.split('CREATE TABLE "Employee_has_badge"')[1];
+    expect(empTable).toContain('"bid" INTEGER NOT NULL');
+    expect(empTable).toContain('FOREIGN KEY ("bid") REFERENCES "Badge" ("bid")');
+  });
+
+  // -----------------------------------------------------------------------
+  // 1:1 both optional → no merge
+  // -----------------------------------------------------------------------
+
+  it('does NOT merge 1:1 both optional (no total participation)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a1', name: 'eid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Badge',
+          attributes: [makeAttr({ id: 'a2', name: 'bid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has_badge',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Both optional → alphabetical FK on Employee, no merge
+    expect(result.ddl).toContain('CREATE TABLE "Employee"');
+    expect(result.ddl).toContain('CREATE TABLE "Badge"');
+    expect(result.ddl).not.toContain('Employee_has_badge');
+    const empTable = result.ddl.split('CREATE TABLE "Employee"')[1];
+    expect(empTable).toContain('"bid" INTEGER');
+    expect(empTable).not.toContain('"bid" INTEGER NOT NULL');
+  });
+
+  // -----------------------------------------------------------------------
+  // Merge with cycle → deferred ALTER TABLE uses merged name
+  // -----------------------------------------------------------------------
+
+  it('handles merge combined with cyclic FK dependencies', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'A',
+          attributes: [makeAttr({ id: 'a1', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'], 'pk1')],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'B',
+          attributes: [makeAttr({ id: 'a2', name: 'bid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'r1',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'r2',
+          participants: [
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // A merged with r1 (min=1 → total participation)
+    expect(result.ddl).toContain('CREATE TABLE "A_r1"');
+    // B is NOT merged (min=0)
+    expect(result.ddl).toContain('CREATE TABLE "B"');
+    // Cycle between A_r1 and B should be handled (tables created + possible ALTER TABLE)
     expect(result.ddl).toContain('FOREIGN KEY');
   });
 });

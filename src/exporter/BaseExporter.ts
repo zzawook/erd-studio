@@ -59,6 +59,9 @@ export abstract class BaseExporter implements Exporter {
       }
     }
 
+    // Track merge candidates: entityName -> relName[]
+    const mergeCandidates = new Map<string, string[]>();
+
     // Handle M:N relationships (junction tables)
     for (const rel of model.relationships) {
       if (rel.participants.length < 2) {
@@ -70,7 +73,15 @@ export abstract class BaseExporter implements Exporter {
         tables.push(this.buildJunctionTable(rel, model, warnings));
       } else {
         // 1:N or 1:1 → add FK to appropriate table
-        this.addRelationshipFKs(rel, model, tables, warnings);
+        const mergeInfo = this.addRelationshipFKs(rel, model, tables, warnings);
+        if (mergeInfo) {
+          const existing = mergeCandidates.get(mergeInfo.entityName);
+          if (existing) {
+            existing.push(mergeInfo.relName);
+          } else {
+            mergeCandidates.set(mergeInfo.entityName, [mergeInfo.relName]);
+          }
+        }
       }
     }
 
@@ -113,6 +124,23 @@ export abstract class BaseExporter implements Exporter {
                 nullable: attr.nullable,
               });
             }
+          }
+        }
+      }
+    }
+
+    // Apply table merges for total participation
+    for (const [entityName, relNames] of mergeCandidates) {
+      const relName = relNames[0];
+      const newName = `${entityName}_${relName}`;
+      const table = tables.find((t) => t.name === entityName);
+      if (table) {
+        table.name = newName;
+        // Update all FK references to use the new table name
+        for (const t of tables) {
+          for (const fk of t.foreignKeys) {
+            if (fk.tableName === entityName) fk.tableName = newName;
+            if (fk.refTable === entityName) fk.refTable = newName;
           }
         }
       }
@@ -373,33 +401,40 @@ export abstract class BaseExporter implements Exporter {
     const isMany0 = isMany(p0.cardinality);
     const isMany1 = isMany(p1.cardinality);
 
-    // 1:N → many side gets FK
+    // (min,max) participation convention: max indicates how many times
+    // the entity participates. FK goes on the side with max=1 (NOT many),
+    // since that entity has a functional dependency to the other.
     if (isMany0 && !isMany1) {
-      return model.entities.find((e) => e.id === p0.entityId) ?? null;
-    }
-    if (isMany1 && !isMany0) {
       return model.entities.find((e) => e.id === p1.entityId) ?? null;
     }
+    if (isMany1 && !isMany0) {
+      return model.entities.find((e) => e.id === p0.entityId) ?? null;
+    }
 
-    // 1:1 → optional side or alphabetically first
+    // 1:1 → mandatory side (min >= 1) gets FK to avoid nulls; alphabetical fallback
     const e0 = model.entities.find((e) => e.id === p0.entityId);
     const e1 = model.entities.find((e) => e.id === p1.entityId);
     if (!e0 || !e1) return null;
 
-    if (p0.cardinality.min === 0 && p1.cardinality.min !== 0) return e0;
-    if (p1.cardinality.min === 0 && p0.cardinality.min !== 0) return e1;
+    if (p0.cardinality.min >= 1 && p1.cardinality.min === 0) return e0;
+    if (p1.cardinality.min >= 1 && p0.cardinality.min === 0) return e1;
     return e0.name > e1.name ? e0 : e1;
   }
 
-  private addRelationshipFKs(rel: Relationship, model: ERDModel, tables: TableDef[], warnings: string[]) {
-    if (rel.participants.length < 2) return;
-    if (rel.isIdentifying) return; // Already handled in weak entity logic
+  private addRelationshipFKs(
+    rel: Relationship,
+    model: ERDModel,
+    tables: TableDef[],
+    warnings: string[],
+  ): { entityName: string; relName: string } | null {
+    if (rel.participants.length < 2) return null;
+    if (rel.isIdentifying) return null; // Already handled in weak entity logic
 
     const fkEntity = this.getFKSideEntity(rel, model);
-    if (!fkEntity) return;
+    if (!fkEntity) return null;
 
     const fkTable = tables.find((t) => t.name === fkEntity.name);
-    if (!fkTable) return;
+    if (!fkTable) return null;
 
     // Find the other entity (the one referenced)
     const otherParticipant = rel.participants.find((p) => p.entityId !== fkEntity.id);
@@ -407,9 +442,9 @@ export abstract class BaseExporter implements Exporter {
       // Self-referencing: use second participant
       if (rel.participants[0].entityId === rel.participants[1].entityId) {
         const entity = model.entities.find((e) => e.id === fkEntity.id);
-        if (!entity) return;
+        if (!entity) return null;
         const pk = entity.candidateKeys.find((ck) => ck.isPrimary);
-        if (!pk) return;
+        if (!pk) return null;
 
         const fkCols: string[] = [];
         const refCols: string[] = [];
@@ -430,18 +465,23 @@ export abstract class BaseExporter implements Exporter {
           refTable: fkEntity.name,
           refColumns: refCols,
         });
-        return;
+        return null; // No merge for self-referencing
       }
-      return;
+      return null;
     }
 
+    // Check total participation of FK entity: in (min,max) participation notation,
+    // total participation means the entity's own min >= 1.
+    const fkParticipant = rel.participants.find((p) => p.entityId === fkEntity.id);
+    const hasTotalParticipation = fkParticipant ? fkParticipant.cardinality.min >= 1 : false;
+
     const refEntity = model.entities.find((e) => e.id === otherParticipant.entityId);
-    if (!refEntity) return;
+    if (!refEntity) return null;
 
     const refPk = refEntity.candidateKeys.find((ck) => ck.isPrimary);
     if (!refPk) {
       warnings.push(`Cannot create FK for relationship "${rel.name}": referenced entity "${refEntity.name}" has no primary key`);
-      return;
+      return null;
     }
 
     const fkCols: string[] = [];
@@ -453,7 +493,11 @@ export abstract class BaseExporter implements Exporter {
         const colName = fkColumnName(refEntity.name, attr.name);
         // Avoid duplicate columns
         if (!fkTable.columns.some((c) => c.name === colName)) {
-          fkTable.columns.push({ name: colName, type: this.mapDataType(attr.dataType), nullable: true });
+          fkTable.columns.push({
+            name: colName,
+            type: this.mapDataType(attr.dataType),
+            nullable: !hasTotalParticipation,
+          });
         }
         fkCols.push(colName);
         refCols.push(attr.name);
@@ -466,6 +510,8 @@ export abstract class BaseExporter implements Exporter {
       refTable: refEntity.name,
       refColumns: refCols,
     });
+
+    return hasTotalParticipation ? { entityName: fkEntity.name, relName: rel.name } : null;
   }
 
   private topologicalSort(tables: TableDef[]): TableDef[] {
