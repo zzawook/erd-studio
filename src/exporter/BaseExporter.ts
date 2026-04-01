@@ -7,6 +7,7 @@ interface FKConstraint {
   columns: string[];
   refTable: string;
   refColumns: string[];
+  onDelete?: 'CASCADE' | 'SET NULL';
 }
 
 interface TableDef {
@@ -62,6 +63,9 @@ export abstract class BaseExporter implements Exporter {
     // Track merge candidates: entityName -> relName[]
     const mergeCandidates = new Map<string, string[]>();
 
+    // Collect relationship IDs that are wrapped by an aggregation
+    const aggregatedRelIds = new Set(model.aggregations.map((a) => a.relationshipId));
+
     // Handle M:N relationships (junction tables)
     for (const rel of model.relationships) {
       if (rel.participants.length < 2) {
@@ -70,10 +74,10 @@ export abstract class BaseExporter implements Exporter {
       }
       if (rel.isIdentifying) continue; // Already handled in weak entity logic
       if (this.isManyToMany(rel)) {
-        tables.push(this.buildJunctionTable(rel, model, warnings));
+        tables.push(this.buildJunctionTable(rel, model, warnings, aggregatedRelIds.has(rel.id)));
       } else {
         // 1:N or 1:1 → add FK to appropriate table
-        const mergeInfo = this.addRelationshipFKs(rel, model, tables, warnings);
+        const mergeInfo = this.addRelationshipFKs(rel, model, tables, warnings, aggregatedRelIds.has(rel.id));
         if (mergeInfo) {
           const existing = mergeCandidates.get(mergeInfo.entityName);
           if (existing) {
@@ -283,6 +287,7 @@ export abstract class BaseExporter implements Exporter {
               refColumns: ownerPk.attributeIds
                 .map((id) => owner.attributes.find((a) => a.id === id)?.name)
                 .filter((n): n is string => n != null),
+              onDelete: 'CASCADE',
             });
           }
         }
@@ -340,7 +345,7 @@ export abstract class BaseExporter implements Exporter {
     return isMany(rel.participants[0].cardinality) && isMany(rel.participants[1].cardinality);
   }
 
-  private buildJunctionTable(rel: Relationship, model: ERDModel, _warnings: string[]): TableDef {
+  private buildJunctionTable(rel: Relationship, model: ERDModel, _warnings: string[], isAggregated = false): TableDef {
     const e1 = model.entities.find((e) => e.id === rel.participants[0].entityId);
     const e2 = model.entities.find((e) => e.id === rel.participants[1].entityId);
     if (!e1 || !e2) return { name: rel.name, columns: [], primaryKey: [], uniqueConstraints: [], foreignKeys: [] };
@@ -387,6 +392,7 @@ export abstract class BaseExporter implements Exporter {
         columns: fkCols,
         refTable: entity.name,
         refColumns: refCols,
+        ...(isAggregated ? { onDelete: 'SET NULL' as const } : {}),
       });
     }
 
@@ -426,6 +432,7 @@ export abstract class BaseExporter implements Exporter {
     model: ERDModel,
     tables: TableDef[],
     warnings: string[],
+    isAggregated = false,
   ): { entityName: string; relName: string } | null {
     if (rel.participants.length < 2) return null;
     if (rel.isIdentifying) return null; // Already handled in weak entity logic
@@ -464,6 +471,7 @@ export abstract class BaseExporter implements Exporter {
           columns: fkCols,
           refTable: fkEntity.name,
           refColumns: refCols,
+          ...(isAggregated ? { onDelete: 'SET NULL' as const } : {}),
         });
         return null; // No merge for self-referencing
       }
@@ -509,6 +517,7 @@ export abstract class BaseExporter implements Exporter {
       columns: fkCols,
       refTable: refEntity.name,
       refColumns: refCols,
+      ...(isAggregated ? { onDelete: 'SET NULL' as const } : {}),
     });
 
     return hasTotalParticipation ? { entityName: fkEntity.name, relName: rel.name } : null;
@@ -572,9 +581,11 @@ export abstract class BaseExporter implements Exporter {
     }
 
     for (const fk of table.foreignKeys) {
-      lines.push(
-        `  FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')})`
-      );
+      let fkLine = `  FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')})`;
+      if (fk.onDelete) {
+        fkLine += ` ON DELETE ${fk.onDelete}`;
+      }
+      lines.push(fkLine);
     }
 
     return `CREATE TABLE ${q(table.name)} (\n${lines.join(',\n')}\n);`;
@@ -582,6 +593,10 @@ export abstract class BaseExporter implements Exporter {
 
   private generateAlterTableFK(fk: FKConstraint): string {
     const q = (n: string) => this.quoteIdentifier(n);
-    return `ALTER TABLE ${q(fk.tableName)} ADD FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')});`;
+    let stmt = `ALTER TABLE ${q(fk.tableName)} ADD FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')})`;
+    if (fk.onDelete) {
+      stmt += ` ON DELETE ${fk.onDelete}`;
+    }
+    return `${stmt};`;
   }
 }

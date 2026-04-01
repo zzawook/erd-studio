@@ -3373,6 +3373,168 @@ describe('PostgreSQLExporter', () => {
     // Cycle between A_r1 and B should be handled (tables created + possible ALTER TABLE)
     expect(result.ddl).toContain('FOREIGN KEY');
   });
+
+  // -----------------------------------------------------------------------
+  // Aggregation: ON DELETE SET NULL for aggregated 1:N relationship
+  // -----------------------------------------------------------------------
+
+  it('generates ON DELETE SET NULL for aggregated 1:N relationship FK', () => {
+    // Course(1) --[has]--> Projects(N), aggregation wraps "has"
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Course',
+          attributes: [makeAttr({ id: 'a1', name: 'course_id', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Projects',
+          attributes: [makeAttr({ id: 'a2', name: 'project_id', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [{ id: 'agg1', name: 'CourseProjects', relationshipId: 'r1' }],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('FOREIGN KEY ("course_id") REFERENCES "Course" ("course_id") ON DELETE SET NULL');
+  });
+
+  // -----------------------------------------------------------------------
+  // Aggregation: ON DELETE SET NULL for aggregated M:N junction table
+  // -----------------------------------------------------------------------
+
+  it('generates ON DELETE SET NULL for aggregated M:N relationship junction table FKs', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'enrolls',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1' }],
+    };
+    const result = exporter.export(model);
+    const junctionDDL = result.ddl.split('CREATE TABLE "enrolls"')[1];
+    expect(junctionDDL).toContain('FOREIGN KEY ("sid") REFERENCES "Student" ("sid") ON DELETE SET NULL');
+    expect(junctionDDL).toContain('FOREIGN KEY ("cid") REFERENCES "Course" ("cid") ON DELETE SET NULL');
+  });
+
+  // -----------------------------------------------------------------------
+  // Non-aggregated relationship: no ON DELETE clause
+  // -----------------------------------------------------------------------
+
+  it('does not add ON DELETE clause for non-aggregated 1:N relationships', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Dept',
+          attributes: [makeAttr({ id: 'a1', name: 'did', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Emp',
+          attributes: [makeAttr({ id: 'a2', name: 'eid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'works_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('FOREIGN KEY ("did") REFERENCES "Dept" ("did")');
+    expect(result.ddl).not.toContain('ON DELETE');
+  });
+
+  // -----------------------------------------------------------------------
+  // Weak entity (identifying relationship): ON DELETE CASCADE
+  // -----------------------------------------------------------------------
+
+  it('generates ON DELETE CASCADE for weak entity identifying relationship FK', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Building',
+          attributes: [makeAttr({ id: 'a1', name: 'bname', dataType: { name: 'VARCHAR', precision: 100 }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Room',
+          isWeak: true,
+          attributes: [makeAttr({ id: 'a2', name: 'rnum', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'located_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const roomDDL = result.ddl.split('CREATE TABLE "Room"')[1];
+    expect(roomDDL).toContain('FOREIGN KEY ("bname") REFERENCES "Building" ("bname") ON DELETE CASCADE');
+  });
 });
 
 // ---------------------------------------------------------------------------
