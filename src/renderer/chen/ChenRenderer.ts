@@ -83,10 +83,7 @@ export const chenRenderer: Renderer = {
       const aggNode: Node<ChenAggregationNodeData> = {
         id: `agg::${agg.id}`,
         type: 'chenAggregation',
-        position: {
-          x: rel.position.x,
-          y: rel.position.y,
-        },
+        position: agg.position,
         data: {
           aggregation: agg,
           width: REL_W,

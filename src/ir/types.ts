@@ -99,6 +99,7 @@ export interface Aggregation {
   id: string;
   name: string;
   relationshipId: string; // the relationship being aggregated
+  position: { x: number; y: number };
 }
 
 // ============================================================

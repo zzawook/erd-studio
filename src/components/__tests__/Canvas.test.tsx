@@ -135,6 +135,37 @@ describe('handleNodeDragStop', () => {
     expect(updateEntity).not.toHaveBeenCalled();
     expect(updateRelationship).not.toHaveBeenCalled();
   });
+
+  it('calls updateAggregation for agg:: nodes (chen notation)', () => {
+    const updateEntity = vi.fn();
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    handleNodeDragStop('agg::agg1', { x: 75, y: 85 }, updateEntity, updateRelationship, updateAggregation);
+    expect(updateAggregation).toHaveBeenCalledWith('agg1', { position: { x: 75, y: 85 } });
+    expect(updateEntity).not.toHaveBeenCalled();
+    expect(updateRelationship).not.toHaveBeenCalled();
+  });
+
+  it('calls updateAggregation for entity:: nodes when ID is in aggregationIds (crowsfoot notation)', () => {
+    const updateEntity = vi.fn();
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    const aggregationIds = new Set(['agg1']);
+    handleNodeDragStop('entity::agg1', { x: 120, y: 130 }, updateEntity, updateRelationship, updateAggregation, aggregationIds);
+    expect(updateAggregation).toHaveBeenCalledWith('agg1', { position: { x: 120, y: 130 } });
+    expect(updateEntity).not.toHaveBeenCalled();
+    expect(updateRelationship).not.toHaveBeenCalled();
+  });
+
+  it('calls updateEntity for entity:: nodes when ID is NOT in aggregationIds', () => {
+    const updateEntity = vi.fn();
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    const aggregationIds = new Set(['agg1']);
+    handleNodeDragStop('entity::e1', { x: 50, y: 60 }, updateEntity, updateRelationship, updateAggregation, aggregationIds);
+    expect(updateEntity).toHaveBeenCalledWith('e1', { position: { x: 50, y: 60 } });
+    expect(updateAggregation).not.toHaveBeenCalled();
+  });
 });
 
 describe('handleNodeClick', () => {

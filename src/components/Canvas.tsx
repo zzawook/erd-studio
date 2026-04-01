@@ -51,14 +51,24 @@ export function handleNodeDragStop(
   position: { x: number; y: number },
   updateEntity: (id: string, patch: { position: { x: number; y: number } }) => void,
   updateRelationship: (id: string, patch: { position: { x: number; y: number } }) => void,
+  updateAggregation?: (id: string, patch: { position: { x: number; y: number } }) => void,
+  aggregationIds?: Set<string>,
 ) {
   const parts = nodeId.split('::');
   const kind = parts[0];
   const id = parts[1];
   if (kind === 'entity') {
-    updateEntity(id, { position });
+    // In crow's foot notation, aggregation nodes use entity:: prefix.
+    // Check if this ID belongs to an aggregation before updating entity.
+    if (aggregationIds?.has(id) && updateAggregation) {
+      updateAggregation(id, { position });
+    } else {
+      updateEntity(id, { position });
+    }
   } else if (kind === 'rel') {
     updateRelationship(id, { position });
+  } else if (kind === 'agg' && updateAggregation) {
+    updateAggregation(id, { position });
   }
 }
 
@@ -96,8 +106,15 @@ export function Canvas() {
   const setSelection = useERDStore((s) => s.setSelection);
   const updateEntity = useERDStore((s) => s.updateEntity);
   const updateRelationship = useERDStore((s) => s.updateRelationship);
+  const updateAggregation = useERDStore((s) => s.updateAggregation);
   const nodePositions = useERDStore((s) => s.nodePositions);
   const setNodePosition = useERDStore((s) => s.setNodePosition);
+
+  // Build a set of aggregation IDs so drag handler can distinguish them from entities
+  const aggregationIds = useMemo(
+    () => new Set(model.aggregations.map((a) => a.id)),
+    [model.aggregations],
+  );
 
   const renderer = notation === 'chen' ? chenRenderer : crowsFootRenderer;
   const rendered = useMemo(() => renderer.render(model, nodePositions), [model, notation, nodePositions]);
@@ -130,18 +147,18 @@ export function Canvas() {
   // Update positions in store during drag so junction dots follow in real-time
   const onNodeDrag = useCallback(
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
-      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship);
+      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
       }
     },
-    [updateEntity, updateRelationship, setNodePosition]
+    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition]
   );
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
-      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship);
+      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
@@ -150,7 +167,7 @@ export function Canvas() {
       const sel = handleNodeClick(node.id);
       setSelection(sel);
     },
-    [updateEntity, updateRelationship, setNodePosition, setSelection]
+    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition, setSelection]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(

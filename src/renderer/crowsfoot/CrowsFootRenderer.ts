@@ -98,21 +98,8 @@ export const crowsFootRenderer: Renderer = {
       const rel = model.relationships.find((r) => r.id === agg.relationshipId);
       if (!rel) continue;
 
-      // Create a virtual entity node for the aggregation
-      // Position it near the aggregated relationship's participants
-      const participantPositions = rel.participants
-        .filter((p) => !p.isAggregation)
-        .map((p) => model.entities.find((e) => e.id === p.entityId)?.position)
-        .filter((pos): pos is { x: number; y: number } => pos != null);
-
-      const avgX = participantPositions.length > 0
-        ? participantPositions.reduce((s, p) => s + p.x, 0) / participantPositions.length
-        : 300;
-      const avgY = participantPositions.length > 0
-        ? participantPositions.reduce((s, p) => s + p.y, 0) / participantPositions.length + 150
-        : 300;
-
-      const aggPosition = { x: avgX, y: avgY };
+      // Use the aggregation's persisted position
+      const aggPosition = agg.position;
 
       // Create a virtual entity representing the aggregation
       const virtualEntity: Entity = {
