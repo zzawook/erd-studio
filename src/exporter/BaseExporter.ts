@@ -236,7 +236,9 @@ export abstract class BaseExporter implements Exporter {
           primaryKey.push(attr.name);
         }
       }
-    } else {
+    } else if (!(entity.isWeak && entity.attributes.some((a) => a.isPartialKey))) {
+      // Weak entities with partial keys get their PK from the identifying
+      // relationship (owner PK + partial key), so skip the warning for them.
       warnings.push(`Entity "${entity.name}" has no primary key`);
     }
 
@@ -284,6 +286,14 @@ export abstract class BaseExporter implements Exporter {
                 .map((id) => owner.attributes.find((a) => a.id === id)?.name)
                 .filter((n): n is string => n != null),
             });
+          }
+        }
+
+        // Include partial key attributes in the primary key for weak entities.
+        // A weak entity's full PK = owner's PK (added above) + the weak entity's partial key.
+        for (const attr of entity.attributes) {
+          if (attr.isPartialKey && !primaryKey.includes(attr.name)) {
+            primaryKey.push(attr.name);
           }
         }
       } else {
