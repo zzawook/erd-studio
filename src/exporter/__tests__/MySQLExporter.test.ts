@@ -255,8 +255,8 @@ describe('MySQLExporter', () => {
           id: 'r1',
           name: 'works',
           participants: [
-            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
-            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
           ],
           isIdentifying: false,
           attributes: [],
