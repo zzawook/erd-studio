@@ -309,7 +309,8 @@ describe('AttributeProperties', () => {
     expect(screen.queryByTestId('attr-partial-key-checkbox')).not.toBeInTheDocument();
   });
 
-  it('toggling partial key ON auto-sets entity as weak', async () => {
+  it('toggles partial key (requires weak entity)', async () => {
+    useERDStore.getState().updateEntity(entityId, { isWeak: true });
     const user = userEvent.setup();
     render(
       <AttributeProperties
@@ -321,12 +322,11 @@ describe('AttributeProperties', () => {
 
     await user.click(screen.getByTestId('attr-partial-key-checkbox'));
     expect(getEntityAttr(entityId, attrId).isPartialKey).toBe(true);
-    expect(useERDStore.getState().model.entities.find((e) => e.id === entityId)!.isWeak).toBe(true);
   });
 
-  it('toggling partial key ON with 1 relationship auto-marks it identifying', async () => {
+  it('auto-marks single connected relationship as identifying', async () => {
     const e2 = useERDStore.getState().addEntity('B', { x: 0, y: 0 });
-    const relId = useERDStore.getState().addRelationship('owns', [
+    const relId = useERDStore.getState().addRelationship('r1', [
       { entityId, cardinality: { min: 1, max: 1 } },
       { entityId: e2, cardinality: { min: 0, max: '*' } },
     ], { x: 0, y: 0 });
@@ -345,7 +345,6 @@ describe('AttributeProperties', () => {
   });
 
   it('toggling last partial key OFF reverts entity to non-weak', async () => {
-    // Set up: entity is weak with one partial key
     useERDStore.getState().updateEntity(entityId, { isWeak: true });
     useERDStore.getState().updateAttribute(entityId, attrId, { isPartialKey: true });
 
@@ -477,7 +476,6 @@ describe('AttributeProperties', () => {
     );
 
     await user.click(screen.getByTestId('attr-partial-key-checkbox'));
-    // Should still be identifying (not toggled off)
     expect(useERDStore.getState().model.relationships.find((r) => r.id === relId)!.isIdentifying).toBe(true);
   });
 
@@ -509,7 +507,6 @@ describe('AttributeProperties', () => {
     await user.click(screen.getByTestId('attr-partial-key-checkbox'));
     await user.click(screen.getByTestId('identifying-rel-cancel'));
 
-    // Entity stays weak because col2 is still a partial key
     expect(useERDStore.getState().model.entities.find((e) => e.id === entityId)!.isWeak).toBe(true);
   });
 
@@ -531,7 +528,7 @@ describe('AttributeProperties', () => {
       />
     );
 
-    expect(screen.getByText('Connected to identifying relationship line')).toBeInTheDocument();
+    expect(screen.getByText('Connected to identifying relationship')).toBeInTheDocument();
   });
 
   it('toggling last partial key OFF un-marks identifying relationship', async () => {
@@ -567,7 +564,6 @@ describe('AttributeProperties', () => {
     );
 
     await user.click(screen.getByTestId('attr-partial-key-checkbox'));
-    // Should not crash, attribute unchanged since no entityId
     expect(getEntityAttr(entityId, attrId).isPartialKey).toBe(false);
   });
 
@@ -631,7 +627,8 @@ describe('AttributeProperties', () => {
       />
     );
 
-    const backButton = screen.getByText(/Back/);
+    // Breadcrumb shows parent name; click it to navigate back
+    const backButton = screen.getByText('T');
     await user.click(backButton);
 
     const selection = useERDStore.getState().selection;
@@ -656,7 +653,8 @@ describe('AttributeProperties', () => {
       />
     );
 
-    const backButton = screen.getByText(/Back/);
+    // Breadcrumb shows parent relationship name; click it to navigate back
+    const backButton = screen.getByText('rel');
     await user.click(backButton);
 
     const selection = useERDStore.getState().selection;
@@ -706,7 +704,8 @@ describe('AttributeProperties', () => {
       />
     );
 
-    const backButton = screen.getByText(/Back/);
+    // Breadcrumb shows the attribute name; click the whole breadcrumb button
+    const backButton = screen.getByText('col');
     await user.click(backButton);
 
     // selection remains null since no entityId was provided

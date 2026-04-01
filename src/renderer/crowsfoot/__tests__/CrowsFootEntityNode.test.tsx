@@ -211,6 +211,7 @@ describe('CrowsFootEntityNode', () => {
       </ReactFlowProvider>,
     );
 
-    expect(screen.getByText('PK,FK')).toBeInTheDocument();
+    expect(screen.getByText('PK')).toBeInTheDocument();
+    expect(screen.getByText('FK')).toBeInTheDocument();
   });
 });

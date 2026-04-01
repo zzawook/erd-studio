@@ -19,17 +19,17 @@ export function ChenAttributeNode({ data, selected }: NodeProps<ChenAttributeNod
 
   return (
     <div
-      className={`flex items-center gap-1.5 px-1 py-0.5 rounded
-        ${selected ? 'bg-blue-100 ring-2 ring-blue-400 ring-offset-1' : ''}`}
+      className={`flex items-center gap-1.5 px-1 py-0.5 rounded transition-all duration-150
+        ${selected ? 'bg-primary-50 ring-2 ring-primary-400 ring-offset-1' : ''}`}
       data-testid="chen-attribute-node"
     >
       <NodeHandles variant="invisible" />
 
       {/* Circle */}
       <div
-        className={`w-4 h-4 rounded-full border-2 shrink-0
+        className={`w-[18px] h-[18px] rounded-full border-2 shrink-0
           ${isFilled
-            ? 'bg-gray-800 border-gray-800'
+            ? 'bg-primary-600 border-primary-600'
             : 'bg-white border-gray-800'
           }
           ${isPartialKey ? 'border-gray-800 bg-white' : ''}`}
@@ -37,7 +37,7 @@ export function ChenAttributeNode({ data, selected }: NodeProps<ChenAttributeNod
       />
 
       {/* Name label outside the circle */}
-      <span className={`text-xs text-gray-800 whitespace-nowrap ${isPrimaryKey ? 'underline' : ''}`}>
+      <span className="text-[12px] text-gray-700 font-medium whitespace-nowrap">
         {attribute.name}
       </span>
     </div>

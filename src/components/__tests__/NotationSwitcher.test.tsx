@@ -27,9 +27,9 @@ describe('NotationSwitcher', () => {
   it('highlights the active notation', () => {
     render(<NotationSwitcher />);
     const chenButton = screen.getByTestId('notation-chen');
-    expect(chenButton.className).toContain('bg-blue-600');
+    expect(chenButton.className).toContain('bg-primary-600');
     const crowsfootButton = screen.getByTestId('notation-crowsfoot');
-    expect(crowsfootButton.className).not.toContain('bg-blue-600');
+    expect(crowsfootButton.className).not.toContain('bg-primary-600');
   });
 
   it('clicking Crow\'s Foot calls setNotation', async () => {
@@ -53,8 +53,8 @@ describe('NotationSwitcher', () => {
     await user.click(screen.getByTestId('notation-crowsfoot'));
     // Re-render reflects store state
     const crowsfootButton = screen.getByTestId('notation-crowsfoot');
-    expect(crowsfootButton.className).toContain('bg-blue-600');
+    expect(crowsfootButton.className).toContain('bg-primary-600');
     const chenButton = screen.getByTestId('notation-chen');
-    expect(chenButton.className).not.toContain('bg-blue-600');
+    expect(chenButton.className).not.toContain('bg-primary-600');
   });
 });

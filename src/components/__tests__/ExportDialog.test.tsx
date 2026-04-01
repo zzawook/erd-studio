@@ -24,17 +24,18 @@ describe('ExportDialog', () => {
 
   it('renders dialect select with PostgreSQL and MySQL options', () => {
     render(<ExportDialog onClose={onClose} />);
-    const select = screen.getByTestId('dialect-select');
-    expect(select).toBeInTheDocument();
-    const options = select.querySelectorAll('option');
-    expect(options).toHaveLength(2);
-    expect(options[0]).toHaveTextContent('PostgreSQL');
-    expect(options[1]).toHaveTextContent('MySQL');
+    // Dialect select is now a segmented button group; the hidden div with testid still exists
+    expect(screen.getByTestId('dialect-select')).toBeInTheDocument();
+    // Both dialect buttons should be rendered
+    expect(screen.getByText('PostgreSQL')).toBeInTheDocument();
+    expect(screen.getByText('MySQL')).toBeInTheDocument();
   });
 
   it('defaults to PostgreSQL dialect', () => {
     render(<ExportDialog onClose={onClose} />);
-    expect(screen.getByTestId('dialect-select')).toHaveValue('PostgreSQL');
+    // PostgreSQL button should have the active class (bg-primary-600)
+    const pgButton = screen.getByText('PostgreSQL');
+    expect(pgButton.className).toContain('bg-primary-600');
   });
 
   it('shows empty DDL placeholder when model is empty', () => {
@@ -60,7 +61,8 @@ describe('ExportDialog', () => {
     useERDStore.getState().addCandidateKey(id, 'PK', [attrId], true);
 
     render(<ExportDialog onClose={onClose} />);
-    await user.selectOptions(screen.getByTestId('dialect-select'), 'MySQL');
+    // Click the MySQL button in the segmented button group
+    await user.click(screen.getByText('MySQL'));
 
     expect(screen.getByTestId('ddl-output').textContent).toContain('CREATE TABLE `User`');
   });
@@ -71,7 +73,7 @@ describe('ExportDialog', () => {
 
     render(<ExportDialog onClose={onClose} />);
     expect(screen.getByTestId('export-warnings')).toBeInTheDocument();
-    expect(screen.getByText('Warnings:')).toBeInTheDocument();
+    expect(screen.getByText('Warnings')).toBeInTheDocument();
   });
 
   it('does not show warnings section when there are none', () => {

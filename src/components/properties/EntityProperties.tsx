@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useERDStore } from '../../ir/store';
 import type { Entity } from '../../ir/types';
 import { CandidateKeyProperties } from './CandidateKeyProperties';
@@ -14,6 +14,13 @@ export function EntityProperties({ entity }: Props) {
   const setSelection = useERDStore((s) => s.setSelection);
 
   const [newAttrName, setNewAttrName] = useState('');
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(timer);
+  }, [confirming]);
 
   const handleAddAttribute = () => {
     if (!newAttrName.trim()) return;
@@ -22,49 +29,53 @@ export function EntityProperties({ entity }: Props) {
     setSelection({ type: 'attribute', entityId: entity.id, attributeId: id });
   };
 
+  const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow";
+
   return (
-    <div className="flex flex-col gap-3" data-testid="entity-properties">
+    <div className="flex flex-col gap-4" data-testid="entity-properties">
       {/* Name */}
       <div>
-        <label className="block text-gray-600 mb-0.5">Name</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
         <input
           value={entity.name}
           onChange={(e) => updateEntity(entity.id, { name: e.target.value })}
-          className="w-full px-2 py-1 border border-gray-300 rounded"
+          className={inputClass}
           data-testid="entity-name-edit"
         />
       </div>
 
       {/* Attributes */}
-      <div>
-        <h4 className="font-bold text-gray-700 mb-1">Attributes</h4>
+      <div className="border-t border-gray-100 pt-3">
+        <h4 className="font-semibold text-gray-700 mb-2 text-sm">Attributes</h4>
         {entity.attributes.length === 0 && (
-          <p className="text-gray-400 italic">No attributes</p>
+          <p className="text-gray-400 italic text-xs py-1">No attributes</p>
         )}
-        {entity.attributes.map((attr) => (
-          <div
-            key={attr.id}
-            onClick={() => setSelection({ type: 'attribute', entityId: entity.id, attributeId: attr.id })}
-            className="px-2 py-0.5 rounded cursor-pointer hover:bg-gray-200 flex justify-between"
-            data-testid={`attr-list-item-${attr.id}`}
-          >
-            <span>{attr.name}</span>
-            <span className="text-gray-400">{attr.dataType.name}</span>
-          </div>
-        ))}
-        <div className="flex gap-1 mt-1">
+        <div className="flex flex-col gap-0.5">
+          {entity.attributes.map((attr) => (
+            <div
+              key={attr.id}
+              onClick={() => setSelection({ type: 'attribute', entityId: entity.id, attributeId: attr.id })}
+              className="px-3 py-1.5 rounded-md cursor-pointer hover:bg-gray-50 flex justify-between items-center transition-colors"
+              data-testid={`attr-list-item-${attr.id}`}
+            >
+              <span className="text-sm text-gray-700">{attr.name}</span>
+              <span className="font-mono text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{attr.dataType.name}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
           <input
             value={newAttrName}
             onChange={(e) => setNewAttrName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddAttribute()}
             placeholder="Attribute name"
-            className="flex-1 px-2 py-0.5 border border-gray-300 rounded"
+            className={`flex-1 ${inputClass}`}
             data-testid="new-attr-name-input"
           />
           <button
             onClick={handleAddAttribute}
             disabled={!newAttrName.trim()}
-            className="px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="shrink-0 px-3 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="add-attr-button"
           >
             Add
@@ -73,20 +84,42 @@ export function EntityProperties({ entity }: Props) {
       </div>
 
       {/* Candidate Keys */}
-      <CandidateKeyProperties entity={entity} />
+      <div className="border-t border-gray-100 pt-3">
+        <CandidateKeyProperties entity={entity} />
+      </div>
 
       {/* Delete */}
-      <button
-        onClick={() => {
-          if (window.confirm(`Delete entity "${entity.name}"?`)) {
-            deleteEntity(entity.id);
-          }
-        }}
-        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 mt-2"
-        data-testid="delete-entity-button"
-      >
-        Delete Entity
-      </button>
+      <div className="border-t border-red-100 pt-4 mt-2">
+        {!confirming ? (
+          <button
+            onClick={() => setConfirming(true)}
+            className="w-full py-2 border border-red-200 text-red-600 rounded-md text-sm font-medium hover:bg-red-50 hover:border-red-300 transition-colors"
+            data-testid="delete-entity-button"
+          >
+            Delete Entity
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirming(false)}
+              className="flex-1 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                deleteEntity(entity.id);
+                setConfirming(false);
+              }}
+              className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
+              style={{ animation: 'confirm-pulse 1.5s ease-in-out infinite' }}
+              data-testid="delete-entity-button"
+            >
+              Confirm Delete
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

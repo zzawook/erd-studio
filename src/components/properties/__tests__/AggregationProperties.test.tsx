@@ -67,24 +67,26 @@ describe('AggregationProperties', () => {
 
   it('deletes aggregation when delete button is clicked and confirmed', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<AggregationProperties aggregation={getAggregation(aggId)} />);
+    // First click shows the confirm UI
+    await user.click(screen.getByTestId('delete-agg-button'));
+    // Second click on the confirm button actually deletes
     await user.click(screen.getByTestId('delete-agg-button'));
 
     expect(useERDStore.getState().model.aggregations).toHaveLength(0);
-    vi.restoreAllMocks();
   });
 
   it('does not delete aggregation when confirm is cancelled', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     render(<AggregationProperties aggregation={getAggregation(aggId)} />);
+    // First click shows the confirm UI
     await user.click(screen.getByTestId('delete-agg-button'));
+    // Click Cancel instead of confirm
+    await user.click(screen.getByText('Cancel'));
 
     expect(useERDStore.getState().model.aggregations).toHaveLength(1);
-    vi.restoreAllMocks();
   });
 
   it('shows [Agg] prefix for aggregation participants', () => {

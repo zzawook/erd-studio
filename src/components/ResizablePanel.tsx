@@ -44,6 +44,17 @@ export function ResizablePanel({ defaultWidth, minWidth, maxWidth, side, childre
     document.body.style.userSelect = 'none';
   }, [width, minWidth, maxWidth, side]);
 
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const step = 10;
+    if (e.key === 'ArrowLeft') {
+      setWidth((w) => Math.max(minWidth, Math.min(maxWidth, w - step)));
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      setWidth((w) => Math.max(minWidth, Math.min(maxWidth, w + step)));
+      e.preventDefault();
+    }
+  }, [minWidth, maxWidth]);
+
   return (
     <div
       className={`relative shrink-0 h-full ${className}`}
@@ -51,13 +62,23 @@ export function ResizablePanel({ defaultWidth, minWidth, maxWidth, side, childre
       data-testid="resizable-panel"
     >
       {children}
-      {/* Resize handle */}
+      {/* Resize handle — wide invisible hit area with thin visible indicator */}
       <div
         onMouseDown={onMouseDown}
-        className={`absolute top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 active:bg-blue-500/50 z-10
-          ${side === 'left' ? 'right-0' : 'left-0'}`}
+        onKeyDown={onKeyDown}
+        tabIndex={0}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize panel"
+        aria-valuenow={width}
+        aria-valuemin={minWidth}
+        aria-valuemax={maxWidth}
+        className={`absolute top-0 bottom-0 w-4 cursor-col-resize z-10 flex items-center justify-center group outline-none
+          ${side === 'left' ? '-right-2' : '-left-2'}`}
         data-testid="resize-handle"
-      />
+      >
+        <div className="w-[2px] h-full bg-transparent group-hover:bg-primary-400 group-focus-visible:bg-primary-400 group-active:bg-primary-500 transition-colors duration-150" />
+      </div>
     </div>
   );
 }
