@@ -263,24 +263,29 @@ export abstract class BaseExporter implements Exporter {
         if (owner) {
           const ownerPk = owner.candidateKeys.find((ck) => ck.isPrimary);
           if (ownerPk) {
+            // Check for column name collisions between owner PK attrs and existing columns
+            const existingColNames = new Set(columns.map((c) => c.name));
+            const fkColNames: string[] = [];
+
             for (const attrId of ownerPk.attributeIds) {
               const attr = owner.attributes.find((a) => a.id === attrId);
               if (attr) {
-                const fkColName = fkColumnName(owner.name, attr.name);
+                const baseName = fkColumnName(owner.name, attr.name);
+                const fkColName = existingColNames.has(baseName)
+                  ? `${owner.name.toLowerCase()}_${attr.name}`
+                  : baseName;
                 columns.push({
                   name: fkColName,
                   type: this.mapDataType(attr.dataType),
                   nullable: false,
                 });
                 primaryKey.push(fkColName);
+                fkColNames.push(fkColName);
               }
             }
             foreignKeys.push({
               tableName: entity.name,
-              columns: ownerPk.attributeIds
-                .map((id) => owner.attributes.find((a) => a.id === id))
-                .filter((a): a is Attribute => a != null)
-                .map((a) => fkColumnName(owner.name, a.name)),
+              columns: fkColNames,
               refTable: owner.name,
               refColumns: ownerPk.attributeIds
                 .map((id) => owner.attributes.find((a) => a.id === id)?.name)

@@ -3634,4 +3634,51 @@ describe('BaseExporter.resolveParticipantEntities', () => {
     // No "has no primary key" warning for the weak entity
     expect(result.warnings).not.toContain('Entity "Project" has no primary key');
   });
+
+  it('prefixes FK column name when weak entity has attribute colliding with owner PK', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'school',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'student',
+          isWeak: true,
+          attributes: [
+            makeAttr({ id: 'a2', name: 'name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: true }),
+            makeAttr({ id: 'a3', name: 'id', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false, isPartialKey: true }),
+          ],
+          candidateKeys: [],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'enrolled_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const studentTable = result.ddl.split('CREATE TABLE "student"')[1];
+    // FK column should be prefixed to avoid collision with student's own "name"
+    expect(studentTable).toContain('"school_name"');
+    expect(studentTable).toContain('PRIMARY KEY ("school_name", "id")');
+    expect(studentTable).toContain('FOREIGN KEY ("school_name") REFERENCES "school" ("name")');
+    // Student's own "name" should still be there
+    expect(studentTable).toContain('"name" VARCHAR(255)');
+  });
 });
