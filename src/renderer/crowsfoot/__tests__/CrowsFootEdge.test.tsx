@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ReactFlowProvider, ReactFlow } from '@xyflow/react';
-import { CrowsFootEdge, drawMarker } from '../edges/CrowsFootEdge';
+import { ReactFlowProvider, ReactFlow, Position } from '@xyflow/react';
+import { CrowsFootEdge, drawMarker, positionToAngle } from '../edges/CrowsFootEdge';
 import type { Relationship, Cardinality } from '../../../ir/types';
 
 // ReactFlow requires ResizeObserver which is not available in jsdom
@@ -303,5 +303,64 @@ describe('drawMarker', () => {
     const keys = elements.map((e) => e.key);
     expect(keys).toContain('circle');
     expect(keys).toContain('one');
+  });
+});
+
+describe('positionToAngle', () => {
+  it('returns 0 for Position.Right (outward/rightward)', () => {
+    expect(positionToAngle(Position.Right)).toBe(0);
+  });
+
+  it('returns PI for Position.Left (outward/leftward)', () => {
+    expect(positionToAngle(Position.Left)).toBe(Math.PI);
+  });
+
+  it('returns PI/2 for Position.Bottom (outward/downward)', () => {
+    expect(positionToAngle(Position.Bottom)).toBe(Math.PI / 2);
+  });
+
+  it('returns -PI/2 for Position.Top (outward/upward)', () => {
+    expect(positionToAngle(Position.Top)).toBe(-Math.PI / 2);
+  });
+});
+
+describe('drawMarker axis-aligned output', () => {
+  it('crow foot prongs spread at entity, converging outward (angle 0, Position.Right)', () => {
+    const elements = drawMarker({ min: 1, max: '*' }, 100, 100, 0);
+    const crow1 = elements.find((e) => e.key === 'crow1');
+    const crow2 = elements.find((e) => e.key === 'crow2');
+    const crow3 = elements.find((e) => e.key === 'crow3');
+    expect(crow1).toBeDefined();
+    expect(crow2).toBeDefined();
+    expect(crow3).toBeDefined();
+    // Middle prong starts at (100,100), converges to (110,100)
+    expect(crow2!.props.x1).toBe(100);
+    expect(crow2!.props.y1).toBe(100);
+    expect(crow2!.props.x2).toBe(110);
+    expect(crow2!.props.y2).toBe(100);
+    // All three prongs converge to the same outward point
+    expect(crow1!.props.x2).toBe(crow2!.props.x2);
+    expect(crow1!.props.y2).toBe(crow2!.props.y2);
+    expect(crow3!.props.x2).toBe(crow2!.props.x2);
+    expect(crow3!.props.y2).toBe(crow2!.props.y2);
+    // Top and bottom prongs are spread perpendicular at the entity end
+    expect(crow1!.props.y1).toBeLessThan(crow2!.props.y1);
+    expect(crow3!.props.y1).toBeGreaterThan(crow2!.props.y1);
+  });
+
+  it('crow foot prongs spread at entity, converging outward (angle PI/2, Position.Bottom)', () => {
+    const elements = drawMarker({ min: 1, max: '*' }, 100, 100, Math.PI / 2);
+    const crow2 = elements.find((e) => e.key === 'crow2');
+    expect(crow2).toBeDefined();
+    // Middle prong: (100,100) → (100,110) — x1 === x2
+    expect(Math.abs(crow2!.props.x1 - crow2!.props.x2)).toBeLessThan(0.001);
+  });
+
+  it('one-line is perpendicular to horizontal edge (angle PI, Position.Left)', () => {
+    const elements = drawMarker({ min: 0, max: 1 }, 100, 100, Math.PI);
+    const oneLine = elements.find((e) => e.key === 'one');
+    expect(oneLine).toBeDefined();
+    // x1 should equal x2 (vertical bar perpendicular to horizontal direction)
+    expect(Math.abs(oneLine!.props.x1 - oneLine!.props.x2)).toBeLessThan(0.001);
   });
 });

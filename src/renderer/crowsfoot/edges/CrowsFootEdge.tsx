@@ -2,6 +2,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  Position,
   type EdgeProps,
   type Edge,
 } from '@xyflow/react';
@@ -30,10 +31,15 @@ export function drawMarker(
   const isMany = cardinality.max === '*' || (typeof cardinality.max === 'number' && cardinality.max > 1);
   const isOptional = cardinality.min === 0;
 
+  // Place the min-cardinality symbol (bar/circle) beyond the max symbol.
+  // For "many" the crow's foot convergence is at `size` px, so place beyond that.
+  // For "one" the perpendicular line is at 0px, so place close to it.
+  const minOffset = isMany ? size + 5 : 10;
+
   if (isOptional) {
     // Circle for optional
-    const cx = x + cos * (size + 5);
-    const cy = y + sin * (size + 5);
+    const cx = x + cos * minOffset;
+    const cy = y + sin * minOffset;
     elements.push(
       <circle
         key="circle"
@@ -47,8 +53,8 @@ export function drawMarker(
     );
   } else {
     // Bar for mandatory
-    const bx = x + cos * (size + 5);
-    const by = y + sin * (size + 5);
+    const bx = x + cos * minOffset;
+    const by = y + sin * minOffset;
     const perpX = -sin * 8;
     const perpY = cos * 8;
     elements.push(
@@ -65,30 +71,36 @@ export function drawMarker(
   }
 
   if (isMany) {
-    // Crow's foot (three lines spreading out)
+    // Crow's foot: three prongs at entity (x,y) converging to a single point outward.
+    // This matches standard Crow's Foot notation where the fork touches the entity.
     const perpX = -sin * 8;
     const perpY = cos * 8;
-    // Top line
+    const cx = x + cos * size;  // convergence point (outward along edge)
+    const cy = y + sin * size;
+    // Top prong
     elements.push(
-      <line key="crow1" x1={x} y1={y} x2={x + cos * size - perpX} y2={y + sin * size - perpY}
+      <line key="crow1" x1={x - perpX} y1={y - perpY} x2={cx} y2={cy}
         stroke="#374151" strokeWidth={1.5} />
     );
-    // Middle line
+    // Middle prong
     elements.push(
-      <line key="crow2" x1={x} y1={y} x2={x + cos * size} y2={y + sin * size}
+      <line key="crow2" x1={x} y1={y} x2={cx} y2={cy}
         stroke="#374151" strokeWidth={1.5} />
     );
-    // Bottom line
+    // Bottom prong
     elements.push(
-      <line key="crow3" x1={x} y1={y} x2={x + cos * size + perpX} y2={y + sin * size + perpY}
+      <line key="crow3" x1={x + perpX} y1={y + perpY} x2={cx} y2={cy}
         stroke="#374151" strokeWidth={1.5} />
     );
   } else {
-    // Single line for "one"
+    // Single line for "one", offset slightly from entity handle
+    const oneOffset = 4;
+    const ox = x + cos * oneOffset;
+    const oy = y + sin * oneOffset;
     const perpX = -sin * 8;
     const perpY = cos * 8;
     elements.push(
-      <line key="one" x1={x - perpX} y1={y - perpY} x2={x + perpX} y2={y + perpY}
+      <line key="one" x1={ox - perpX} y1={oy - perpY} x2={ox + perpX} y2={oy + perpY}
         stroke="#374151" strokeWidth={1.5} />
     );
   }
@@ -96,36 +108,53 @@ export function drawMarker(
   return elements;
 }
 
+/**
+ * Convert a handle Position to the outward-pointing angle for marker drawing.
+ * The angle points away from the entity along the edge, so `drawMarker`'s fan
+ * (which spreads in the angle direction) opens toward the entity — matching
+ * standard Crow's Foot notation where the prongs face the entity.
+ */
+export function positionToAngle(position: Position): number {
+  switch (position) {
+    case Position.Right:  return 0;             // edge exits right → angle rightward (outward)
+    case Position.Left:   return Math.PI;       // edge exits left  → angle leftward (outward)
+    case Position.Bottom: return Math.PI / 2;   // edge exits down  → angle downward (outward)
+    case Position.Top:    return -Math.PI / 2;  // edge exits up    → angle upward (outward)
+  }
+}
+
 export function CrowsFootEdge({
   id,
   sourceX,
   sourceY,
+  sourcePosition,
   targetX,
   targetY,
+  targetPosition,
   data,
 }: EdgeProps<CrowsFootEdgeType>) {
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
+    sourcePosition,
     targetX,
     targetY,
+    targetPosition,
     borderRadius: 8,
   });
 
-  const sourceAngle = Math.atan2(targetY - sourceY, targetX - sourceX);
-  const targetAngle = Math.atan2(sourceY - targetY, sourceX - targetX);
+  const sourceAngle = positionToAngle(sourcePosition);
+  const targetAngle = positionToAngle(targetPosition);
 
   return (
     <>
       <BaseEdge id={id} path={edgePath} style={{ stroke: '#374151', strokeWidth: 1.5 }} />
 
       {/* Markers at source and target */}
-      <svg className="react-flow__edge-interaction" style={{ overflow: 'visible' }}>
-        <g>
-          {data?.sourceCardinality && drawMarker(data.sourceCardinality, sourceX, sourceY, sourceAngle)}
-          {data?.targetCardinality && drawMarker(data.targetCardinality, targetX, targetY, targetAngle)}
-        </g>
-      </svg>
+      <g>
+        {data?.sourceCardinality && drawMarker(data.sourceCardinality, sourceX, sourceY, sourceAngle)}
+        {data?.targetCardinality && drawMarker(data.targetCardinality, targetX, targetY, targetAngle)}
+      </g>
 
       {/* Relationship name label */}
       {data?.relationship && (

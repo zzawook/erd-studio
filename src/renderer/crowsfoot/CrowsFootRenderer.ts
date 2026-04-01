@@ -4,6 +4,7 @@ import type { ERDModel, Entity } from '../../ir/types';
 import type { CrowsFootEntityNodeData, ForeignKeyInfo } from './nodes/CrowsFootEntityNode';
 import type { CrowsFootEdgeData } from './edges/CrowsFootEdge';
 import { isMany, fkColumnName } from '../../utils/cardinality';
+import { getHandlesForPair } from '../shared/getHandlesForPair';
 
 function computeForeignKeys(entity: Entity, model: ERDModel): ForeignKeyInfo[] {
   const fks: ForeignKeyInfo[] = [];
@@ -75,6 +76,9 @@ export const crowsFootRenderer: Renderer = {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
 
+    // Build position lookup for handle assignment
+    const positionMap = new Map<string, { x: number; y: number }>();
+
     // Process entities
     for (const entity of model.entities) {
       const foreignKeys = computeForeignKeys(entity, model);
@@ -86,6 +90,7 @@ export const crowsFootRenderer: Renderer = {
         data: { entity, foreignKeys },
       };
       nodes.push(entityNode);
+      positionMap.set(entity.id, entity.position);
     }
 
     // Process aggregations as virtual entity nodes
@@ -107,6 +112,8 @@ export const crowsFootRenderer: Renderer = {
         ? participantPositions.reduce((s, p) => s + p.y, 0) / participantPositions.length + 150
         : 300;
 
+      const aggPosition = { x: avgX, y: avgY };
+
       // Create a virtual entity representing the aggregation
       const virtualEntity: Entity = {
         id: agg.id,
@@ -114,16 +121,17 @@ export const crowsFootRenderer: Renderer = {
         isWeak: false,
         attributes: [],
         candidateKeys: [],
-        position: { x: avgX, y: avgY },
+        position: aggPosition,
       };
 
       const aggNode: Node<CrowsFootEntityNodeData> = {
         id: `entity::${agg.id}`,
         type: 'crowsfootEntity',
-        position: virtualEntity.position,
+        position: aggPosition,
         data: { entity: virtualEntity, foreignKeys: [] },
       };
       nodes.push(aggNode);
+      positionMap.set(agg.id, aggPosition);
     }
 
     // Process relationships as edges between entities
@@ -136,10 +144,16 @@ export const crowsFootRenderer: Renderer = {
       const sourceNodeId = `entity::${source.entityId}`;
       const targetNodeId = `entity::${target.entityId}`;
 
+      const sourcePos = positionMap.get(source.entityId) ?? { x: 0, y: 0 };
+      const targetPos = positionMap.get(target.entityId) ?? { x: 0, y: 0 };
+      const handles = getHandlesForPair(sourcePos, targetPos);
+
       const edge: Edge<CrowsFootEdgeData> = {
         id: `edge::${rel.id}`,
         source: sourceNodeId,
         target: targetNodeId,
+        sourceHandle: handles.sourceHandle,
+        targetHandle: handles.targetHandle,
         type: 'crowsfootEdge',
         data: {
           relationship: rel,

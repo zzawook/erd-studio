@@ -7,6 +7,7 @@ import type { ChenRelationshipNodeData } from './nodes/ChenRelationshipNode';
 import type { ChenAggregationNodeData } from './nodes/ChenAggregationNode';
 import type { ChenJunctionNodeData } from './nodes/ChenJunctionNode';
 import type { ChenEdgeData } from './edges/ChenEdge';
+import { getHandlesForPair } from '../shared/getHandlesForPair';
 
 const ATTR_RADIUS = 120;
 const ATTR_START_ANGLE = -Math.PI / 2;
@@ -24,35 +25,6 @@ function computeAttributePosition(
     x: parentPos.x + ATTR_RADIUS * Math.cos(angle),
     y: parentPos.y + ATTR_RADIUS * Math.sin(angle),
   };
-}
-
-/**
- * Determine which side of the parent the attribute is on,
- * returning the appropriate source handle (on the entity) and target handle (on the attribute).
- */
-function getHandlesForAttr(
-  parentPos: { x: number; y: number },
-  attrPos: { x: number; y: number },
-): { sourceHandle: string; targetHandle: string } {
-  const dx = attrPos.x - parentPos.x;
-  const dy = attrPos.y - parentPos.y;
-
-  // Determine dominant direction
-  if (Math.abs(dx) > Math.abs(dy)) {
-    // Horizontal: attribute is to the left or right
-    if (dx > 0) {
-      return { sourceHandle: 'right-src', targetHandle: 'left' };
-    } else {
-      return { sourceHandle: 'left-src', targetHandle: 'right' };
-    }
-  } else {
-    // Vertical: attribute is above or below
-    if (dy > 0) {
-      return { sourceHandle: 'bottom-src', targetHandle: 'top' };
-    } else {
-      return { sourceHandle: 'top-src', targetHandle: 'bottom' };
-    }
-  }
 }
 
 // Approximate node dimensions for handle position calculation
@@ -155,7 +127,7 @@ export const chenRenderer: Renderer = {
         });
 
         // Compute junction on the actual handle-to-handle line
-        const erHandlesForJunction = getHandlesForAttr(dominantEntity.position, identRel.position);
+        const erHandlesForJunction = getHandlesForPair(dominantEntity.position, identRel.position);
         const relExit = getHandleExitPoint(
           identRel.position,
           handleSide(erHandlesForJunction.targetHandle),
@@ -216,7 +188,7 @@ export const chenRenderer: Renderer = {
         };
         nodes.push(attrNode);
 
-        const handles = getHandlesForAttr(entity.position, attrPosition);
+        const handles = getHandlesForPair(entity.position, attrPosition);
         const attrEdge: Edge<ChenEdgeData> = {
           id: `edge::ea::${entity.id}::${attr.id}`,
           source: `entity::${entity.id}`,
@@ -256,7 +228,7 @@ export const chenRenderer: Renderer = {
         nodes.push(attrNode);
 
         // Edge 1: entity → partial key attribute (normal attribute connection)
-        const entityHandles = getHandlesForAttr(entity.position, attrPosition);
+        const entityHandles = getHandlesForPair(entity.position, attrPosition);
         edges.push({
           id: `edge::ea::${entity.id}::${attr.id}`,
           source: `entity::${entity.id}`,
@@ -270,14 +242,14 @@ export const chenRenderer: Renderer = {
         // Edge 2: partial key attribute → junction node (branches to the participation line)
         if (wInfo) {
           // Use same handle-to-handle calculation for the junction position
-          const pkHandles = getHandlesForAttr(wInfo.dominantPos, wInfo.relPos);
+          const pkHandles = getHandlesForPair(wInfo.dominantPos, wInfo.relPos);
           const pkRelExit = getHandleExitPoint(wInfo.relPos, handleSide(pkHandles.targetHandle), 'relationship');
           const pkDomExit = getHandleExitPoint(wInfo.dominantPos, handleSide(pkHandles.sourceHandle), 'entity');
           const junctionPos = {
             x: (pkRelExit.x + pkDomExit.x) / 2,
             y: (pkRelExit.y + pkDomExit.y) / 2,
           };
-          const junctionHandles = getHandlesForAttr(attrPosition, junctionPos);
+          const junctionHandles = getHandlesForPair(attrPosition, junctionPos);
           edges.push({
             id: `edge::pk::${entity.id}::${attr.id}`,
             source: attrNodeId,
@@ -319,7 +291,7 @@ export const chenRenderer: Renderer = {
         }
 
         // Straight edge from entity to relationship (junction dot sits on top visually)
-        const erHandles = getHandlesForAttr(participantPos, rel.position);
+        const erHandles = getHandlesForPair(participantPos, rel.position);
 
         const erEdge: Edge<ChenEdgeData> = {
           id: `edge::er::${rel.id}::${participant.entityId}${participant.role ? `::${participant.role}` : ''}`,
@@ -356,7 +328,7 @@ export const chenRenderer: Renderer = {
         };
         nodes.push(attrNode);
 
-        const relAttrHandles = getHandlesForAttr(rel.position, relAttrPosition);
+        const relAttrHandles = getHandlesForPair(rel.position, relAttrPosition);
         const raEdge: Edge<ChenEdgeData> = {
           id: `edge::ra::${rel.id}::${attr.id}`,
           source: `rel::${rel.id}`,
