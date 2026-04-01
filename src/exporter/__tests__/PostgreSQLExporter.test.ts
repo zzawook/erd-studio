@@ -1292,6 +1292,78 @@ describe('PostgreSQLExporter', () => {
   });
 
   // -----------------------------------------------------------------------
+  // Candidate key columns must be NOT NULL (issue #16)
+  // -----------------------------------------------------------------------
+
+  it('adds NOT NULL to candidate key column even when attribute is nullable', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Students',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'Names', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false }),
+            makeAttr({ id: 'a2', name: 'Emails', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false }),
+            makeAttr({ id: 'a3', name: 'ids', dataType: { name: 'VARCHAR', precision: 255 }, nullable: true }),
+          ],
+          candidateKeys: [makePK(['a2']), makeUK(['a3'])],
+        }),
+      ],
+      relationships: [],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('"ids" VARCHAR(255) NOT NULL');
+    expect(result.ddl).toContain('UNIQUE ("ids")');
+    expect(result.ddl).toContain('PRIMARY KEY ("Emails")');
+  });
+
+  it('adds NOT NULL to all columns in a composite candidate key', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'T',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a2', name: 'first_name', dataType: { name: 'VARCHAR' }, nullable: true }),
+            makeAttr({ id: 'a3', name: 'last_name', dataType: { name: 'VARCHAR' }, nullable: true }),
+          ],
+          candidateKeys: [makePK(['a1']), makeUK(['a2', 'a3'])],
+        }),
+      ],
+      relationships: [],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('"first_name" VARCHAR(255) NOT NULL');
+    expect(result.ddl).toContain('"last_name" VARCHAR(255) NOT NULL');
+    expect(result.ddl).toContain('UNIQUE ("first_name", "last_name")');
+  });
+
+  it('adds NOT NULL to multiple candidate key columns across separate keys', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'T',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a2', name: 'email', dataType: { name: 'VARCHAR' }, nullable: true }),
+            makeAttr({ id: 'a3', name: 'ssn', dataType: { name: 'VARCHAR' }, nullable: true }),
+          ],
+          candidateKeys: [makePK(['a1']), makeUK(['a2'], 'uk1'), makeUK(['a3'], 'uk2')],
+        }),
+      ],
+      relationships: [],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('"email" VARCHAR(255) NOT NULL');
+    expect(result.ddl).toContain('"ssn" VARCHAR(255) NOT NULL');
+  });
+
+  // -----------------------------------------------------------------------
   // Junction table with missing entity references
   // -----------------------------------------------------------------------
 
