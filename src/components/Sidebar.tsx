@@ -5,6 +5,16 @@ import { validateCardinality } from '../utils/validation';
 import { CollapsibleSection } from './CollapsibleSection';
 import { showToast } from './Toast';
 
+interface ParticipantFormEntry {
+  entityValue: string;
+  min: string;
+  max: string;
+}
+
+function emptyParticipant(): ParticipantFormEntry {
+  return { entityValue: '', min: '0', max: '*' };
+}
+
 export function Sidebar() {
   const model = useERDStore((s) => s.model);
   const addEntity = useERDStore((s) => s.addEntity);
@@ -18,12 +28,10 @@ export function Sidebar() {
 
   // Relationship form
   const [relName, setRelName] = useState('');
-  const [relEntity1, setRelEntity1] = useState('');
-  const [relEntity2, setRelEntity2] = useState('');
-  const [relMin1, setRelMin1] = useState('0');
-  const [relMax1, setRelMax1] = useState('*');
-  const [relMin2, setRelMin2] = useState('0');
-  const [relMax2, setRelMax2] = useState('*');
+  const [relParticipants, setRelParticipants] = useState<ParticipantFormEntry[]>([
+    emptyParticipant(),
+    emptyParticipant(),
+  ]);
   const [relIdentifying, setRelIdentifying] = useState(false);
   const [relError, setRelError] = useState('');
 
@@ -41,22 +49,52 @@ export function Sidebar() {
     showToast(`Entity "${entityName.trim()}" created`, 'success');
   };
 
+  const updateRelParticipant = (index: number, patch: Partial<ParticipantFormEntry>) => {
+    setRelParticipants((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, ...patch } : p))
+    );
+    setRelError('');
+  };
+
+  const addRelParticipant = () => {
+    setRelParticipants((prev) => [...prev, emptyParticipant()]);
+    setRelError('');
+  };
+
+  const removeRelParticipant = (index: number) => {
+    setRelParticipants((prev) => prev.filter((_, i) => i !== index));
+    setRelError('');
+  };
+
   const handleAddRelationship = () => {
-    if (!relName.trim() || !relEntity1 || !relEntity2) {
+    if (!relName.trim()) {
       setRelError('Fill in all fields');
       return;
     }
 
-    const v1 = validateCardinality(relMin1, relMax1);
-    if (v1) { setRelError(`Entity 1: ${v1}`); return; }
+    // Validate all participants have entities selected
+    for (let i = 0; i < relParticipants.length; i++) {
+      if (!relParticipants[i].entityValue) {
+        setRelError('Fill in all fields');
+        return;
+      }
+    }
 
-    const v2 = validateCardinality(relMin2, relMax2);
-    if (v2) { setRelError(`Entity 2: ${v2}`); return; }
+    // Must have at least 2 participants
+    if (relParticipants.length < 2) {
+      setRelError('At least 2 participants required');
+      return;
+    }
 
-    const min1 = parseInt(relMin1, 10);
-    const max1 = relMax1 === '*' ? '*' as const : parseInt(relMax1, 10);
-    const min2 = parseInt(relMin2, 10);
-    const max2 = relMax2 === '*' ? '*' as const : parseInt(relMax2, 10);
+    // Validate cardinalities
+    for (let i = 0; i < relParticipants.length; i++) {
+      const p = relParticipants[i];
+      const v = validateCardinality(p.min, p.max);
+      if (v) {
+        setRelError(`Entity ${i + 1}: ${v}`);
+        return;
+      }
+    }
 
     const parseParticipantId = (val: string): { entityId: string; isAggregation: boolean } => {
       if (val.startsWith('agg:')) {
@@ -65,18 +103,20 @@ export function Sidebar() {
       return { entityId: val, isAggregation: false };
     };
 
-    const p1 = parseParticipantId(relEntity1);
-    const p2 = parseParticipantId(relEntity2);
+    const participants: Participant[] = relParticipants.map((p) => {
+      const parsed = parseParticipantId(p.entityValue);
+      const min = parseInt(p.min, 10);
+      const max = p.max === '*' ? '*' as const : parseInt(p.max, 10);
+      return {
+        entityId: parsed.entityId,
+        cardinality: { min, max },
+        isAggregation: parsed.isAggregation,
+      };
+    });
 
-    const participants: Participant[] = [
-      { entityId: p1.entityId, cardinality: { min: min1, max: max1 }, isAggregation: p1.isAggregation },
-      { entityId: p2.entityId, cardinality: { min: min2, max: max2 }, isAggregation: p2.isAggregation },
-    ];
-
-    // Position between the two entities/aggregations
+    // Position at the centroid of all participant entities/aggregations
     const findPos = (id: string, isAgg: boolean) => {
       if (isAgg) {
-        // Use the aggregated relationship's position
         const agg = model.aggregations.find((a) => a.id === id);
         const rel = agg ? model.relationships.find((r) => r.id === agg.relationshipId) : null;
         return rel?.position ?? { x: 300, y: 200 };
@@ -84,11 +124,10 @@ export function Sidebar() {
       return model.entities.find((e) => e.id === id)?.position ?? { x: 300, y: 200 };
     };
 
-    const e1Pos = findPos(p1.entityId, p1.isAggregation);
-    const e2Pos = findPos(p2.entityId, p2.isAggregation);
+    const positions = participants.map((p) => findPos(p.entityId, p.isAggregation ?? false));
     const pos = {
-      x: (e1Pos.x + e2Pos.x) / 2,
-      y: (e1Pos.y + e2Pos.y) / 2,
+      x: positions.reduce((sum, p) => sum + p.x, 0) / positions.length,
+      y: positions.reduce((sum, p) => sum + p.y, 0) / positions.length,
     };
 
     const id = addRelationship(relName.trim(), participants, pos);
@@ -98,12 +137,7 @@ export function Sidebar() {
     }
 
     setRelName('');
-    setRelEntity1('');
-    setRelEntity2('');
-    setRelMin1('0');
-    setRelMax1('*');
-    setRelMin2('0');
-    setRelMax2('*');
+    setRelParticipants([emptyParticipant(), emptyParticipant()]);
     setRelIdentifying(false);
     setRelError('');
     setSelection({ type: 'relationship', relationshipId: id });
@@ -186,83 +220,67 @@ export function Sidebar() {
             data-testid="rel-name-input"
           />
 
-          <select
-            value={relEntity1}
-            onChange={(e) => { setRelEntity1(e.target.value); setRelError(''); }}
-            className={selectClass}
-            data-testid="rel-entity1-select"
+          {/* Dynamic participant list */}
+          {relParticipants.map((p, i) => (
+            <div key={i} className="p-2 bg-gray-50 rounded-md border border-gray-100 flex flex-col gap-1.5" data-testid={`rel-participant-${i}`}>
+              <div className="flex items-center gap-1">
+                <select
+                  value={p.entityValue}
+                  onChange={(e) => updateRelParticipant(i, { entityValue: e.target.value })}
+                  className={`flex-1 ${selectClass}`}
+                  data-testid={`rel-entity${i + 1}-select`}
+                >
+                  <option value="">Entity {i + 1}...</option>
+                  {model.entities.map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                  {model.aggregations.map((a) => (
+                    <option key={`agg-${a.id}`} value={`agg:${a.id}`}>[Agg] {a.name}</option>
+                  ))}
+                </select>
+                {relParticipants.length > 2 && (
+                  <button
+                    onClick={() => removeRelParticipant(i)}
+                    className="shrink-0 w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Remove participant"
+                    data-testid={`rel-remove-participant-${i}`}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-0.5">Min</label>
+                  <input
+                    value={p.min}
+                    onChange={(e) => updateRelParticipant(i, { min: e.target.value })}
+                    className={`${inputClass} text-center`}
+                    placeholder="0"
+                    data-testid={`rel-min${i + 1}-input`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-0.5">Max</label>
+                  <input
+                    value={p.max}
+                    onChange={(e) => updateRelParticipant(i, { max: e.target.value })}
+                    className={`${inputClass} text-center`}
+                    placeholder="*"
+                    data-testid={`rel-max${i + 1}-input`}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <button
+            onClick={addRelParticipant}
+            className="w-full py-1.5 border border-dashed border-gray-300 text-gray-500 rounded-md text-xs hover:border-primary-400 hover:text-primary-600 transition-colors"
+            data-testid="rel-add-participant-button"
           >
-            <option value="">Entity 1...</option>
-            {model.entities.map((e) => (
-              <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-            {model.aggregations.map((a) => (
-              <option key={`agg-${a.id}`} value={`agg:${a.id}`}>[Agg] {a.name}</option>
-            ))}
-          </select>
-
-          {/* Cardinality 1 */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Min</label>
-              <input
-                value={relMin1}
-                onChange={(e) => { setRelMin1(e.target.value); setRelError(''); }}
-                className={`${inputClass} text-center`}
-                placeholder="0"
-                data-testid="rel-min1-input"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Max</label>
-              <input
-                value={relMax1}
-                onChange={(e) => { setRelMax1(e.target.value); setRelError(''); }}
-                className={`${inputClass} text-center`}
-                placeholder="*"
-                data-testid="rel-max1-input"
-              />
-            </div>
-          </div>
-
-          <select
-            value={relEntity2}
-            onChange={(e) => { setRelEntity2(e.target.value); setRelError(''); }}
-            className={selectClass}
-            data-testid="rel-entity2-select"
-          >
-            <option value="">Entity 2...</option>
-            {model.entities.map((e) => (
-              <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-            {model.aggregations.map((a) => (
-              <option key={`agg-${a.id}`} value={`agg:${a.id}`}>[Agg] {a.name}</option>
-            ))}
-          </select>
-
-          {/* Cardinality 2 */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Min</label>
-              <input
-                value={relMin2}
-                onChange={(e) => { setRelMin2(e.target.value); setRelError(''); }}
-                className={`${inputClass} text-center`}
-                placeholder="0"
-                data-testid="rel-min2-input"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Max</label>
-              <input
-                value={relMax2}
-                onChange={(e) => { setRelMax2(e.target.value); setRelError(''); }}
-                className={`${inputClass} text-center`}
-                placeholder="*"
-                data-testid="rel-max2-input"
-              />
-            </div>
-          </div>
+            + Add Participant
+          </button>
 
           <label className="flex items-center gap-2 text-sm text-gray-600 py-1">
             <input

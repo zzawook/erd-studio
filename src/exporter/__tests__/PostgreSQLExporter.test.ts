@@ -3499,3 +3499,208 @@ describe('BaseExporter.resolveParticipantEntities', () => {
     expect(result[0].name).toBe('A');
   });
 });
+
+// ---------------------------------------------------------------------------
+// N-ary Relationship DDL Generation
+// ---------------------------------------------------------------------------
+
+describe('N-ary Relationships', () => {
+  it('generates a junction table for ternary relationships', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1', name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2', name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+        makeEntity({
+          id: 'e3', name: 'Instructor',
+          attributes: [makeAttr({ id: 'a3', name: 'iid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'], 'pk3')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1', name: 'Teaches',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+
+    const result = exporter.export(model);
+    const ddl = result.ddl;
+
+    // Should generate a junction table named "Teaches"
+    expect(ddl).toContain('CREATE TABLE "Teaches"');
+
+    // Junction table should have FK columns for all 3 entities
+    expect(ddl).toContain('"sid"');
+    expect(ddl).toContain('"cid"');
+    expect(ddl).toContain('"iid"');
+
+    // Junction table should have a composite PK with all 3 FK columns
+    expect(ddl).toContain('PRIMARY KEY ("sid", "cid", "iid")');
+
+    // Junction table should have FK references to all 3 entity tables
+    expect(ddl).toContain('REFERENCES "Student"');
+    expect(ddl).toContain('REFERENCES "Course"');
+    expect(ddl).toContain('REFERENCES "Instructor"');
+  });
+
+  it('generates junction table for ternary relationship with PK name collisions', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1', name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2', name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+        makeEntity({
+          id: 'e3', name: 'Instructor',
+          attributes: [makeAttr({ id: 'a3', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'], 'pk3')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1', name: 'Teaches',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+
+    const result = exporter.export(model);
+    const ddl = result.ddl;
+
+    // With all entities having "id" as PK, there should be collision handling
+    expect(ddl).toContain('CREATE TABLE "Teaches"');
+    // Disambiguated column names
+    expect(ddl).toContain('"student_id"');
+    expect(ddl).toContain('"course_id"');
+    expect(ddl).toContain('"instructor_id"');
+  });
+
+  it('adds relationship attributes to the junction table for n-ary relationships', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1', name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2', name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+        makeEntity({
+          id: 'e3', name: 'Instructor',
+          attributes: [makeAttr({ id: 'a3', name: 'iid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'], 'pk3')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1', name: 'Teaches',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [
+            makeAttr({ id: 'ra1', name: 'grade', dataType: { name: 'VARCHAR', precision: 2 } }),
+          ],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+
+    const result = exporter.export(model);
+    const ddl = result.ddl;
+
+    // The junction table should include the relationship attribute
+    expect(ddl).toContain('CREATE TABLE "Teaches"');
+    expect(ddl).toContain('"grade"');
+  });
+
+  it('generates junction table for quaternary relationships', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1', name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2', name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'cid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'], 'pk2')],
+        }),
+        makeEntity({
+          id: 'e3', name: 'Instructor',
+          attributes: [makeAttr({ id: 'a3', name: 'iid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'], 'pk3')],
+        }),
+        makeEntity({
+          id: 'e4', name: 'Semester',
+          attributes: [makeAttr({ id: 'a4', name: 'sem_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a4'], 'pk4')],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1', name: 'Registration',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e4', cardinality: { min: 1, max: '*' } },
+          ],
+          isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+
+    const result = exporter.export(model);
+    const ddl = result.ddl;
+
+    expect(ddl).toContain('CREATE TABLE "Registration"');
+    // All 4 FK columns
+    expect(ddl).toContain('"sid"');
+    expect(ddl).toContain('"cid"');
+    expect(ddl).toContain('"iid"');
+    expect(ddl).toContain('"sem_id"');
+    // PK includes all 4
+    expect(ddl).toContain('PRIMARY KEY ("sid", "cid", "iid", "sem_id")');
+    // FK references to all 4 entities
+    expect(ddl).toContain('REFERENCES "Student"');
+    expect(ddl).toContain('REFERENCES "Course"');
+    expect(ddl).toContain('REFERENCES "Instructor"');
+    expect(ddl).toContain('REFERENCES "Semester"');
+  });
+});

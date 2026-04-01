@@ -69,7 +69,7 @@ export abstract class BaseExporter implements Exporter {
         continue;
       }
       if (rel.isIdentifying) continue; // Already handled in weak entity logic
-      if (this.isManyToMany(rel)) {
+      if (this.needsJunctionTable(rel)) {
         tables.push(this.buildJunctionTable(rel, model, warnings));
       } else {
         // 1:N or 1:1 → add FK to appropriate table
@@ -97,20 +97,15 @@ export abstract class BaseExporter implements Exporter {
           continue;
         }
 
-        if (this.isManyToMany(rel)) {
+        if (this.needsJunctionTable(rel)) {
           // Add to junction table
-          const e1 = model.entities.find((e) => e.id === rel.participants[0].entityId);
-          const e2 = model.entities.find((e) => e.id === rel.participants[1].entityId);
-          if (e1 && e2) {
-            const jName = rel.name;
-            const jTable = tables.find((t) => t.name === jName);
-            if (jTable) {
-              jTable.columns.push({
-                name: attr.name,
-                type: this.mapDataType(attr.dataType),
-                nullable: attr.nullable,
-              });
-            }
+          const jTable = tables.find((t) => t.name === rel.name);
+          if (jTable) {
+            jTable.columns.push({
+              name: attr.name,
+              type: this.mapDataType(attr.dataType),
+              nullable: attr.nullable,
+            });
           }
         } else {
           // Add to the FK side table
@@ -335,24 +330,35 @@ export abstract class BaseExporter implements Exporter {
     };
   }
 
-  private isManyToMany(rel: Relationship): boolean {
+  /** Returns true if a relationship needs a junction table (M:N binary or any n-ary). */
+  private needsJunctionTable(rel: Relationship): boolean {
     if (rel.participants.length < 2) return false;
+    // N-ary relationships (3+ participants) always need a junction table
+    if (rel.participants.length > 2) return true;
+    // Binary M:N also needs a junction table
     return isMany(rel.participants[0].cardinality) && isMany(rel.participants[1].cardinality);
   }
 
   private buildJunctionTable(rel: Relationship, model: ERDModel, _warnings: string[]): TableDef {
-    const e1 = model.entities.find((e) => e.id === rel.participants[0].entityId);
-    const e2 = model.entities.find((e) => e.id === rel.participants[1].entityId);
-    if (!e1 || !e2) return { name: rel.name, columns: [], primaryKey: [], uniqueConstraints: [], foreignKeys: [] };
+    // Resolve all participant entities (including through aggregations)
+    const participantEntities: Entity[] = [];
+    for (const p of rel.participants) {
+      const entities = this.resolveParticipantEntities(p, model);
+      participantEntities.push(...entities);
+    }
+
+    if (participantEntities.length === 0) {
+      return { name: rel.name, columns: [], primaryKey: [], uniqueConstraints: [], foreignKeys: [] };
+    }
 
     const tableName = rel.name;
     const columns: TableDef['columns'] = [];
     const pkCols: string[] = [];
     const foreignKeys: FKConstraint[] = [];
 
-    // Detect FK column name collisions across both entities
+    // Detect FK column name collisions across all entities
     const allAttrNames: string[] = [];
-    for (const entity of [e1, e2]) {
+    for (const entity of participantEntities) {
       const pk = entity.candidateKeys.find((ck) => ck.isPrimary);
       if (!pk) continue;
       for (const attrId of pk.attributeIds) {
@@ -362,7 +368,7 @@ export abstract class BaseExporter implements Exporter {
     }
     const hasCollision = new Set(allAttrNames).size < allAttrNames.length;
 
-    for (const entity of [e1, e2]) {
+    for (const entity of participantEntities) {
       const pk = entity.candidateKeys.find((ck) => ck.isPrimary);
       if (!pk) continue;
 
@@ -375,8 +381,11 @@ export abstract class BaseExporter implements Exporter {
           const colName = hasCollision
             ? `${entity.name.toLowerCase()}_${attr.name}`
             : fkColumnName(entity.name, attr.name);
-          columns.push({ name: colName, type: this.mapDataType(attr.dataType), nullable: false });
-          pkCols.push(colName);
+          // Avoid duplicate columns (e.g., same entity appearing multiple times)
+          if (!columns.some((c) => c.name === colName)) {
+            columns.push({ name: colName, type: this.mapDataType(attr.dataType), nullable: false });
+            pkCols.push(colName);
+          }
           fkCols.push(colName);
           refCols.push(attr.name);
         }

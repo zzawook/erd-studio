@@ -896,4 +896,165 @@ describe('CrowsFootRenderer', () => {
     expect(monitorEdge?.data?.sourceCardinality).toEqual({ min: 1, max: 1 });
     expect(monitorEdge?.data?.targetCardinality).toEqual({ min: 0, max: '*' });
   });
+
+  // -----------------------------------------------------------------------
+  // N-ary relationship rendering
+  // -----------------------------------------------------------------------
+  it('creates a crowsfootRelationship node for ternary relationships', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'Student', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'Course', position: { x: 300, y: 0 } }),
+        makeEntity({ id: 'e3', name: 'Instructor', position: { x: 150, y: 300 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Teaches',
+          position: { x: 150, y: 150 },
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { nodes, edges } = crowsFootRenderer.render(model);
+
+    // Should have 3 entity nodes + 1 relationship node = 4
+    const entityNodes = nodes.filter((n) => n.type === 'crowsfootEntity');
+    const relNodes = nodes.filter((n) => n.type === 'crowsfootRelationship');
+    expect(entityNodes).toHaveLength(3);
+    expect(relNodes).toHaveLength(1);
+    expect(relNodes[0].id).toBe('rel::r1');
+    expect(relNodes[0].data?.relationship.name).toBe('Teaches');
+
+    // Should have 3 edges (one per participant)
+    expect(edges).toHaveLength(3);
+
+    // All edges should source from the relationship node
+    for (const edge of edges) {
+      expect(edge.source).toBe('rel::r1');
+    }
+
+    // Target entities
+    const targets = edges.map((e) => e.target).sort();
+    expect(targets).toEqual(['entity::e1', 'entity::e2', 'entity::e3']);
+  });
+
+  it('renders binary relationships as direct edges (not through relationship node)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'A', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'B', position: { x: 200, y: 0 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Rel',
+          position: { x: 100, y: 0 },
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { nodes, edges } = crowsFootRenderer.render(model);
+
+    // No relationship node for binary
+    expect(nodes.filter((n) => n.type === 'crowsfootRelationship')).toHaveLength(0);
+    expect(nodes).toHaveLength(2);
+
+    // Direct edge between entities
+    expect(edges).toHaveLength(1);
+    expect(edges[0].source).toBe('entity::e1');
+    expect(edges[0].target).toBe('entity::e2');
+  });
+
+  it('n-ary relationship edges include participant cardinalities', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'A', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'B', position: { x: 200, y: 0 } }),
+        makeEntity({ id: 'e3', name: 'C', position: { x: 100, y: 200 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Ternary',
+          position: { x: 100, y: 100 },
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e3', cardinality: { min: 0, max: 1 } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { edges } = crowsFootRenderer.render(model);
+
+    // Each edge has the participant's cardinality on the target side
+    const e1Edge = edges.find((e) => e.target === 'entity::e1');
+    expect(e1Edge?.data?.targetCardinality).toEqual({ min: 0, max: '*' });
+
+    const e2Edge = edges.find((e) => e.target === 'entity::e2');
+    expect(e2Edge?.data?.targetCardinality).toEqual({ min: 1, max: 1 });
+
+    const e3Edge = edges.find((e) => e.target === 'entity::e3');
+    expect(e3Edge?.data?.targetCardinality).toEqual({ min: 0, max: 1 });
+  });
+
+  it('n-ary relationships do not add FK markers to entity nodes', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'sid' })],
+          candidateKeys: [{ id: 'ck1', name: 'PK', attributeIds: ['a1'], isPrimary: true }],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'cid' })],
+          candidateKeys: [{ id: 'ck2', name: 'PK', attributeIds: ['a2'], isPrimary: true }],
+        }),
+        makeEntity({
+          id: 'e3',
+          name: 'Instructor',
+          attributes: [makeAttr({ id: 'a3', name: 'iid' })],
+          candidateKeys: [{ id: 'ck3', name: 'PK', attributeIds: ['a3'], isPrimary: true }],
+        }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Teaches',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { nodes } = crowsFootRenderer.render(model);
+
+    // No FK markers on any entity for n-ary relationships
+    for (const node of nodes) {
+      if (node.type === 'crowsfootEntity') {
+        expect(node.data?.foreignKeys).toEqual([]);
+      }
+    }
+  });
 });

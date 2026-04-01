@@ -23,6 +23,7 @@ import { ChenAggregationNode } from '../renderer/chen/nodes/ChenAggregationNode'
 import { ChenJunctionNode } from '../renderer/chen/nodes/ChenJunctionNode';
 import { ChenEdge } from '../renderer/chen/edges/ChenEdge';
 import { CrowsFootEntityNode } from '../renderer/crowsfoot/nodes/CrowsFootEntityNode';
+import { CrowsFootRelationshipNode } from '../renderer/crowsfoot/nodes/CrowsFootRelationshipNode';
 import { CrowsFootEdge } from '../renderer/crowsfoot/edges/CrowsFootEdge';
 import type { SelectionTarget } from '../ir/types';
 
@@ -36,6 +37,7 @@ const chenNodeTypes: NodeTypes = {
 
 const crowsfootNodeTypes: NodeTypes = {
   crowsfootEntity: CrowsFootEntityNode,
+  crowsfootRelationship: CrowsFootRelationshipNode,
 };
 
 const chenEdgeTypes: EdgeTypes = {

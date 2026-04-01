@@ -1,16 +1,25 @@
 import type { Node, Edge } from '@xyflow/react';
 import type { Renderer, RendererOutput } from '../types';
-import type { ERDModel, Entity } from '../../ir/types';
+import type { ERDModel, Entity, Relationship } from '../../ir/types';
 import type { CrowsFootEntityNodeData, ForeignKeyInfo } from './nodes/CrowsFootEntityNode';
+import type { CrowsFootRelationshipNodeData } from './nodes/CrowsFootRelationshipNode';
 import type { CrowsFootEdgeData } from './edges/CrowsFootEdge';
 import { isMany, fkColumnName } from '../../utils/cardinality';
 import { getHandlesForPair } from '../shared/getHandlesForPair';
+
+/** Returns true if a relationship has 3 or more participants (n-ary). */
+function isNary(rel: Relationship): boolean {
+  return rel.participants.length > 2;
+}
 
 function computeForeignKeys(entity: Entity, model: ERDModel): ForeignKeyInfo[] {
   const fks: ForeignKeyInfo[] = [];
 
   for (const rel of model.relationships) {
     if (rel.participants.length < 2) continue;
+
+    // N-ary relationships (3+) are handled via junction tables — no FK markers on entities
+    if (isNary(rel)) continue;
 
     for (let i = 0; i < rel.participants.length; i++) {
       const participant = rel.participants[i];
@@ -138,30 +147,66 @@ export const crowsFootRenderer: Renderer = {
     for (const rel of model.relationships) {
       if (rel.participants.length < 2) continue;
 
-      const source = rel.participants[0];
-      const target = rel.participants[1];
+      if (isNary(rel)) {
+        // N-ary relationship: create a central relationship diamond node
+        // and draw crow's foot edges from it to each participant entity
+        const relNode: Node<CrowsFootRelationshipNodeData> = {
+          id: `rel::${rel.id}`,
+          type: 'crowsfootRelationship',
+          position: rel.position,
+          data: { relationship: rel },
+        };
+        nodes.push(relNode);
 
-      const sourceNodeId = `entity::${source.entityId}`;
-      const targetNodeId = `entity::${target.entityId}`;
+        for (let i = 0; i < rel.participants.length; i++) {
+          const participant = rel.participants[i];
+          const entityNodeId = `entity::${participant.entityId}`;
+          const participantPos = positionMap.get(participant.entityId) ?? { x: 0, y: 0 };
+          const handles = getHandlesForPair(rel.position, participantPos);
 
-      const sourcePos = positionMap.get(source.entityId) ?? { x: 0, y: 0 };
-      const targetPos = positionMap.get(target.entityId) ?? { x: 0, y: 0 };
-      const handles = getHandlesForPair(sourcePos, targetPos);
+          const edge: Edge<CrowsFootEdgeData> = {
+            id: `edge::${rel.id}::${participant.entityId}${participant.role ? `::${participant.role}` : ''}`,
+            source: `rel::${rel.id}`,
+            target: entityNodeId,
+            sourceHandle: handles.sourceHandle,
+            targetHandle: handles.targetHandle,
+            type: 'crowsfootEdge',
+            data: {
+              relationship: rel,
+              // Source side (relationship node) has no cardinality marker
+              sourceCardinality: { min: 1, max: 1 },
+              targetCardinality: participant.cardinality,
+            },
+          };
+          edges.push(edge);
+        }
+      } else {
+        // Binary relationship: direct edge between two entities
+        const source = rel.participants[0];
+        const target = rel.participants[1];
 
-      const edge: Edge<CrowsFootEdgeData> = {
-        id: `edge::${rel.id}`,
-        source: sourceNodeId,
-        target: targetNodeId,
-        sourceHandle: handles.sourceHandle,
-        targetHandle: handles.targetHandle,
-        type: 'crowsfootEdge',
-        data: {
-          relationship: rel,
-          sourceCardinality: source.cardinality,
-          targetCardinality: target.cardinality,
-        },
-      };
-      edges.push(edge);
+        const sourceNodeId = `entity::${source.entityId}`;
+        const targetNodeId = `entity::${target.entityId}`;
+
+        const sourcePos = positionMap.get(source.entityId) ?? { x: 0, y: 0 };
+        const targetPos = positionMap.get(target.entityId) ?? { x: 0, y: 0 };
+        const handles = getHandlesForPair(sourcePos, targetPos);
+
+        const edge: Edge<CrowsFootEdgeData> = {
+          id: `edge::${rel.id}`,
+          source: sourceNodeId,
+          target: targetNodeId,
+          sourceHandle: handles.sourceHandle,
+          targetHandle: handles.targetHandle,
+          type: 'crowsfootEdge',
+          data: {
+            relationship: rel,
+            sourceCardinality: source.cardinality,
+            targetCardinality: target.cardinality,
+          },
+        };
+        edges.push(edge);
+      }
     }
 
     return { nodes, edges };

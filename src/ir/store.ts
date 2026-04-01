@@ -41,6 +41,8 @@ export interface ERDState {
   addRelationship: (name: string, participants: Participant[], position: { x: number; y: number }) => string;
   updateRelationship: (id: string, patch: Partial<Pick<Relationship, 'name' | 'isIdentifying' | 'position'>>) => void;
   updateParticipant: (relId: string, index: number, patch: Partial<Participant>) => void;
+  addParticipant: (relId: string, participant: Participant) => void;
+  removeParticipant: (relId: string, index: number) => void;
   deleteRelationship: (id: string) => void;
 
   // Aggregation actions
@@ -381,6 +383,32 @@ export const useERDStore = create<ERDState>((set, get) => ({
                   i === index ? { ...p, ...patch } : p
                 ),
               }
+            : r
+        ),
+      },
+    }));
+  },
+
+  addParticipant: (relId, participant) => {
+    set((state) => ({
+      model: {
+        ...state.model,
+        relationships: state.model.relationships.map((r) =>
+          r.id === relId
+            ? { ...r, participants: [...r.participants, participant] }
+            : r
+        ),
+      },
+    }));
+  },
+
+  removeParticipant: (relId, index) => {
+    set((state) => ({
+      model: {
+        ...state.model,
+        relationships: state.model.relationships.map((r) =>
+          r.id === relId
+            ? { ...r, participants: r.participants.filter((_, i) => i !== index) }
             : r
         ),
       },
