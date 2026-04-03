@@ -234,6 +234,34 @@ describe('MySQLExporter', () => {
     expect(result.warnings).toHaveLength(0);
   });
 
+  // -----------------------------------------------------------------------
+  // Candidate key columns must be NOT NULL (issue #16)
+  // -----------------------------------------------------------------------
+
+  it('adds NOT NULL to candidate key column even when attribute is nullable', () => {
+    function makeUK(attrIds: string[], id = 'uk1'): CandidateKey {
+      return { id, name: 'UK', attributeIds: attrIds, isPrimary: false };
+    }
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Students',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'email', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false }),
+            makeAttr({ id: 'a2', name: 'ids', dataType: { name: 'VARCHAR', precision: 255 }, nullable: true }),
+          ],
+          candidateKeys: [makePK(['a1']), makeUK(['a2'])],
+        }),
+      ],
+      relationships: [],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.ddl).toContain('`ids` VARCHAR(255) NOT NULL');
+    expect(result.ddl).toContain('UNIQUE (`ids`)');
+  });
+
   it('handles 1:N FK with backtick quoting', () => {
     const model: ERDModel = {
       entities: [

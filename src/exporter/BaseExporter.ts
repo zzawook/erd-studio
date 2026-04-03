@@ -253,6 +253,11 @@ export abstract class BaseExporter implements Exporter {
         .filter((n): n is string => n != null);
       if (attrs.length > 0) {
         uniqueConstraints.push(attrs);
+        // Candidate keys must be NOT NULL
+        for (const attrName of attrs) {
+          const col = columns.find((c) => c.name === attrName);
+          if (col) col.nullable = false;
+        }
       }
     }
 
