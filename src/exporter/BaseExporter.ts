@@ -240,7 +240,9 @@ export abstract class BaseExporter implements Exporter {
           primaryKey.push(attr.name);
         }
       }
-    } else {
+    } else if (!(entity.isWeak && entity.attributes.some((a) => a.isPartialKey))) {
+      // Weak entities with partial keys get their PK from the identifying
+      // relationship (owner PK + partial key), so skip the warning for them.
       warnings.push(`Entity "${entity.name}" has no primary key`);
     }
 
@@ -265,30 +267,43 @@ export abstract class BaseExporter implements Exporter {
         if (owner) {
           const ownerPk = owner.candidateKeys.find((ck) => ck.isPrimary);
           if (ownerPk) {
+            // Check for column name collisions between owner PK attrs and existing columns
+            const existingColNames = new Set(columns.map((c) => c.name));
+            const fkColNames: string[] = [];
+
             for (const attrId of ownerPk.attributeIds) {
               const attr = owner.attributes.find((a) => a.id === attrId);
               if (attr) {
-                const fkColName = fkColumnName(owner.name, attr.name);
+                const baseName = fkColumnName(owner.name, attr.name);
+                const fkColName = existingColNames.has(baseName)
+                  ? `${owner.name.toLowerCase()}_${attr.name}`
+                  : baseName;
                 columns.push({
                   name: fkColName,
                   type: this.mapDataType(attr.dataType),
                   nullable: false,
                 });
                 primaryKey.push(fkColName);
+                fkColNames.push(fkColName);
               }
             }
             foreignKeys.push({
               tableName: entity.name,
-              columns: ownerPk.attributeIds
-                .map((id) => owner.attributes.find((a) => a.id === id))
-                .filter((a): a is Attribute => a != null)
-                .map((a) => fkColumnName(owner.name, a.name)),
+              columns: fkColNames,
               refTable: owner.name,
               refColumns: ownerPk.attributeIds
                 .map((id) => owner.attributes.find((a) => a.id === id)?.name)
                 .filter((n): n is string => n != null),
               onDelete: 'CASCADE',
             });
+          }
+        }
+
+        // Include partial key attributes in the primary key for weak entities.
+        // A weak entity's full PK = owner's PK (added above) + the weak entity's partial key.
+        for (const attr of entity.attributes) {
+          if (attr.isPartialKey && !primaryKey.includes(attr.name)) {
+            primaryKey.push(attr.name);
           }
         }
       } else {

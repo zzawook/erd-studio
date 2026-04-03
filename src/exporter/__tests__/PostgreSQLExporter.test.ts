@@ -3660,4 +3660,187 @@ describe('BaseExporter.resolveParticipantEntities', () => {
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('A');
   });
+
+  // -----------------------------------------------------------------------
+  // Partial key conversion for weak entities (issue #15)
+  // -----------------------------------------------------------------------
+
+  it('includes partial key attribute in weak entity composite PK', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Schools',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Students',
+          isWeak: true,
+          attributes: [
+            makeAttr({ id: 'a2', name: 'Name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: true }),
+            makeAttr({ id: 'a3', name: 'student_id', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false, isPartialKey: true }),
+          ],
+          candidateKeys: [],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'identifies',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const studentsTable = result.ddl.split('CREATE TABLE "Students"')[1];
+    expect(studentsTable).toContain('PRIMARY KEY ("name", "student_id")');
+    expect(studentsTable).toContain('FOREIGN KEY ("name") REFERENCES "Schools" ("name")');
+  });
+
+  it('includes partial key in PK even when weak entity also has a candidate key', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Building',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Room',
+          isWeak: true,
+          attributes: [
+            makeAttr({ id: 'a2', name: 'number', dataType: { name: 'INT' }, nullable: false, isPartialKey: true }),
+          ],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has_rooms',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const roomTable = result.ddl.split('CREATE TABLE "Room"')[1];
+    // "number" from candidate key + "id" from owner PK — partial key should not be duplicated
+    expect(roomTable).toContain('PRIMARY KEY ("number", "id")');
+    expect(roomTable).toContain('FOREIGN KEY ("id") REFERENCES "Building" ("id")');
+  });
+
+  it('includes partial key in weak entity PK when there is no candidate key', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Department',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'dept_id', dataType: { name: 'INT' }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Project',
+          isWeak: true,
+          attributes: [
+            makeAttr({ id: 'a2', name: 'proj_name', dataType: { name: 'VARCHAR', precision: 100 }, nullable: false, isPartialKey: true }),
+            makeAttr({ id: 'a3', name: 'budget', dataType: { name: 'NUMERIC' }, nullable: true }),
+          ],
+          candidateKeys: [],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'runs',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const projectTable = result.ddl.split('CREATE TABLE "Project"')[1];
+    // PK should be composite: owner's PK + partial key
+    expect(projectTable).toContain('PRIMARY KEY ("dept_id", "proj_name")');
+    expect(projectTable).toContain('FOREIGN KEY ("dept_id") REFERENCES "Department" ("dept_id")');
+    // No "has no primary key" warning for the weak entity
+    expect(result.warnings).not.toContain('Entity "Project" has no primary key');
+  });
+
+  it('prefixes FK column name when weak entity has attribute colliding with owner PK', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'school',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'student',
+          isWeak: true,
+          attributes: [
+            makeAttr({ id: 'a2', name: 'name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: true }),
+            makeAttr({ id: 'a3', name: 'id', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false, isPartialKey: true }),
+          ],
+          candidateKeys: [],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'enrolled_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 1, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: true,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const studentTable = result.ddl.split('CREATE TABLE "student"')[1];
+    // FK column should be prefixed to avoid collision with student's own "name"
+    expect(studentTable).toContain('"school_name"');
+    expect(studentTable).toContain('PRIMARY KEY ("school_name", "id")');
+    expect(studentTable).toContain('FOREIGN KEY ("school_name") REFERENCES "school" ("name")');
+    // Student's own "name" should still be there
+    expect(studentTable).toContain('"name" VARCHAR(255)');
+  });
 });
