@@ -793,6 +793,88 @@ describe('ChenRenderer', () => {
   // -----------------------------------------------------------------------
   // Vertical arrangement with weak entity junction
   // -----------------------------------------------------------------------
+  // -----------------------------------------------------------------------
+  // N-ary relationship rendering
+  // -----------------------------------------------------------------------
+  it('creates edges for all participants in a ternary relationship', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'Student', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'Course', position: { x: 300, y: 0 } }),
+        makeEntity({ id: 'e3', name: 'Instructor', position: { x: 150, y: 300 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Teaches',
+          position: { x: 150, y: 150 },
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { nodes, edges } = chenRenderer.render(model);
+
+    // Should have 3 entity nodes + 1 relationship node = 4
+    expect(nodes.filter((n) => n.type === 'chenEntity')).toHaveLength(3);
+    expect(nodes.filter((n) => n.type === 'chenRelationship')).toHaveLength(1);
+
+    // Should have 3 entity-relationship edges (one per participant)
+    const erEdges = edges.filter((e) => e.data?.edgeKind === 'entity-relationship');
+    expect(erEdges).toHaveLength(3);
+
+    // Each edge targets the relationship
+    for (const edge of erEdges) {
+      expect(edge.target).toBe('rel::r1');
+    }
+
+    // Edge sources should be the 3 entities
+    const sources = erEdges.map((e) => e.source).sort();
+    expect(sources).toEqual(['entity::e1', 'entity::e2', 'entity::e3']);
+  });
+
+  it('handles ternary relationship with attributes', () => {
+    const relAttr = makeAttr({ id: 'ra1', name: 'grade' });
+
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'Student' }),
+        makeEntity({ id: 'e2', name: 'Course' }),
+        makeEntity({ id: 'e3', name: 'Instructor' }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Teaches',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 1, max: 1 } },
+          ],
+          attributes: [relAttr],
+        }),
+      ],
+      aggregations: [],
+    };
+
+    const { nodes, edges } = chenRenderer.render(model);
+
+    // Relationship attribute node
+    const relAttrNode = nodes.find((n) => n.id === 'relattr::r1::ra1');
+    expect(relAttrNode).toBeDefined();
+    expect(relAttrNode?.data?.attribute.name).toBe('grade');
+
+    // Relationship-attribute edge
+    const raEdge = edges.find((e) => e.id === 'edge::ra::r1::ra1');
+    expect(raEdge).toBeDefined();
+    expect(raEdge?.source).toBe('rel::r1');
+  });
+
   it('computes junction node correctly with vertical arrangement', () => {
     const model: ERDModel = {
       entities: [

@@ -1259,6 +1259,13 @@ describe('Aggregation CRUD', () => {
     expect(sel?.type).toBe('entity');
   });
 
+  it('deleteAggregation clears selection when deleting the selected aggregation', () => {
+    const aggId = state().addAggregation('AggR', relId);
+    state().setSelection({ type: 'aggregation', aggregationId: aggId });
+    state().deleteAggregation(aggId);
+    expect(state().selection).toBeNull();
+  });
+
   it('deleteEntity cascades to remove relationships and their aggregations', () => {
     state().addAggregation('AggR', relId);
     expect(state().model.aggregations).toHaveLength(1);
@@ -1267,5 +1274,118 @@ describe('Aggregation CRUD', () => {
     state().deleteEntity(e1);
     expect(state().model.relationships).toHaveLength(0);
     expect(state().model.aggregations).toHaveLength(0);
+  });
+});
+
+// ============================================================
+// N-ary Relationship Support
+// ============================================================
+
+describe('N-ary Relationships', () => {
+  let e1: string;
+  let e2: string;
+  let e3: string;
+
+  beforeEach(() => {
+    e1 = state().addEntity('Student', { x: 0, y: 0 });
+    e2 = state().addEntity('Course', { x: 100, y: 0 });
+    e3 = state().addEntity('Instructor', { x: 200, y: 0 });
+  });
+
+  it('addRelationship with 3 participants creates a ternary relationship', () => {
+    const participants: Participant[] = [
+      { entityId: e1, cardinality: { min: 0, max: '*' } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+      { entityId: e3, cardinality: { min: 1, max: 1 } },
+    ];
+    const relId = state().addRelationship('Teaches', participants, { x: 100, y: 100 });
+
+    const rel = state().model.relationships.find((r) => r.id === relId)!;
+    expect(rel.participants).toHaveLength(3);
+    expect(rel.participants[0].entityId).toBe(e1);
+    expect(rel.participants[1].entityId).toBe(e2);
+    expect(rel.participants[2].entityId).toBe(e3);
+  });
+
+  it('addParticipant adds a new participant to an existing relationship', () => {
+    const participants: Participant[] = [
+      { entityId: e1, cardinality: { min: 0, max: '*' } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ];
+    const relId = state().addRelationship('Enrolls', participants, { x: 100, y: 100 });
+    expect(state().model.relationships.find((r) => r.id === relId)!.participants).toHaveLength(2);
+
+    state().addParticipant(relId, { entityId: e3, cardinality: { min: 1, max: 1 } });
+    const rel = state().model.relationships.find((r) => r.id === relId)!;
+    expect(rel.participants).toHaveLength(3);
+    expect(rel.participants[2].entityId).toBe(e3);
+    expect(rel.participants[2].cardinality).toEqual({ min: 1, max: 1 });
+  });
+
+  it('removeParticipant removes a participant by index', () => {
+    const participants: Participant[] = [
+      { entityId: e1, cardinality: { min: 0, max: '*' } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+      { entityId: e3, cardinality: { min: 1, max: 1 } },
+    ];
+    const relId = state().addRelationship('Teaches', participants, { x: 100, y: 100 });
+
+    state().removeParticipant(relId, 1); // Remove Course (index 1)
+    const rel = state().model.relationships.find((r) => r.id === relId)!;
+    expect(rel.participants).toHaveLength(2);
+    expect(rel.participants[0].entityId).toBe(e1);
+    expect(rel.participants[1].entityId).toBe(e3);
+  });
+
+  it('updateParticipant works on n-ary relationships', () => {
+    const participants: Participant[] = [
+      { entityId: e1, cardinality: { min: 0, max: '*' } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+      { entityId: e3, cardinality: { min: 1, max: 1 } },
+    ];
+    const relId = state().addRelationship('Teaches', participants, { x: 100, y: 100 });
+
+    state().updateParticipant(relId, 2, { cardinality: { min: 0, max: '*' } });
+    const rel = state().model.relationships.find((r) => r.id === relId)!;
+    expect(rel.participants[2].cardinality).toEqual({ min: 0, max: '*' });
+  });
+
+  it('deleteEntity removes n-ary relationship if entity is a participant', () => {
+    const participants: Participant[] = [
+      { entityId: e1, cardinality: { min: 0, max: '*' } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+      { entityId: e3, cardinality: { min: 1, max: 1 } },
+    ];
+    state().addRelationship('Teaches', participants, { x: 100, y: 100 });
+    expect(state().model.relationships).toHaveLength(1);
+
+    state().deleteEntity(e2);
+    // Relationship references e2 so it should be removed
+    expect(state().model.relationships).toHaveLength(0);
+  });
+
+  it('addRelationship with 4 participants creates a quaternary relationship', () => {
+    const e4 = state().addEntity('Semester', { x: 300, y: 0 });
+    const participants: Participant[] = [
+      { entityId: e1, cardinality: { min: 0, max: '*' } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+      { entityId: e3, cardinality: { min: 1, max: 1 } },
+      { entityId: e4, cardinality: { min: 1, max: '*' } },
+    ];
+    const relId = state().addRelationship('Registration', participants, { x: 150, y: 100 });
+
+    const rel = state().model.relationships.find((r) => r.id === relId)!;
+    expect(rel.participants).toHaveLength(4);
+  });
+
+  it('addParticipant on nonexistent relationship is a no-op', () => {
+    state().addParticipant('nonexistent', { entityId: e1, cardinality: { min: 0, max: 1 } });
+    // No crash; relationships list is unchanged
+    expect(state().model.relationships).toHaveLength(0);
+  });
+
+  it('removeParticipant on nonexistent relationship is a no-op', () => {
+    state().removeParticipant('nonexistent', 0);
+    expect(state().model.relationships).toHaveLength(0);
   });
 });

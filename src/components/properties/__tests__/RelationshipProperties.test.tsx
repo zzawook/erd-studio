@@ -66,8 +66,10 @@ describe('RelationshipProperties', () => {
 
   it('shows participants with entity names', () => {
     render(<RelationshipProperties relationship={getRel(relId)} />);
-    expect(screen.getByText('Department')).toBeInTheDocument();
-    expect(screen.getByText('Employee')).toBeInTheDocument();
+    // Entity names appear both in participant display and in the "Add entity" dropdown.
+    // Use getAllByText and check at least one match exists.
+    expect(screen.getAllByText('Department').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Employee').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows participant with role when present', () => {
@@ -269,5 +271,94 @@ describe('RelationshipProperties', () => {
     await user.click(screen.getByText('Cancel'));
 
     expect(useERDStore.getState().model.relationships).toHaveLength(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // Add / Remove Participants (n-ary)
+  // -----------------------------------------------------------------------
+
+  it('adds a third participant via the dropdown', async () => {
+    const user = userEvent.setup();
+    const e3id = useERDStore.getState().addEntity('Project', { x: 400, y: 0 });
+
+    render(<RelationshipProperties relationship={getRel(relId)} />);
+
+    await user.selectOptions(screen.getByTestId('new-participant-select'), e3id);
+    await user.click(screen.getByTestId('add-participant-button'));
+
+    expect(getRel(relId).participants).toHaveLength(3);
+    expect(getRel(relId).participants[2].entityId).toBe(e3id);
+  });
+
+  it('add participant button is disabled when no entity selected', () => {
+    render(<RelationshipProperties relationship={getRel(relId)} />);
+    expect(screen.getByTestId('add-participant-button')).toBeDisabled();
+  });
+
+  it('does not show remove button for binary relationships', () => {
+    render(<RelationshipProperties relationship={getRel(relId)} />);
+    expect(screen.queryByTestId('remove-participant-0')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('remove-participant-1')).not.toBeInTheDocument();
+  });
+
+  it('shows remove button when 3+ participants', () => {
+    const e3id = useERDStore.getState().addEntity('Project', { x: 400, y: 0 });
+    useERDStore.getState().addParticipant(relId, {
+      entityId: e3id, cardinality: { min: 0, max: '*' },
+    });
+
+    render(<RelationshipProperties relationship={getRel(relId)} />);
+    expect(screen.getByTestId('remove-participant-0')).toBeInTheDocument();
+    expect(screen.getByTestId('remove-participant-1')).toBeInTheDocument();
+    expect(screen.getByTestId('remove-participant-2')).toBeInTheDocument();
+  });
+
+  it('removes a participant', async () => {
+    const user = userEvent.setup();
+    const e3id = useERDStore.getState().addEntity('Project', { x: 400, y: 0 });
+    useERDStore.getState().addParticipant(relId, {
+      entityId: e3id, cardinality: { min: 0, max: '*' },
+    });
+
+    render(<RelationshipProperties relationship={getRel(relId)} />);
+    await user.click(screen.getByTestId('remove-participant-2'));
+
+    expect(getRel(relId).participants).toHaveLength(2);
+  });
+
+  it('shows aggregation participant with [Agg] prefix', () => {
+    const aggRelId = useERDStore.getState().addRelationship('inner', [
+      { entityId: e1id, cardinality: { min: 1, max: 1 } },
+      { entityId: e2id, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    const aggId = useERDStore.getState().addAggregation('MyAgg', aggRelId);
+
+    // Create a relationship with the aggregation as a participant
+    const outerRelId = useERDStore.getState().addRelationship('outer', [
+      { entityId: aggId, cardinality: { min: 0, max: '*' }, isAggregation: true },
+      { entityId: e1id, cardinality: { min: 0, max: 1 } },
+    ], { x: 0, y: 0 });
+
+    render(<RelationshipProperties relationship={getRel(outerRelId)} />);
+    expect(screen.getAllByText('[Agg] MyAgg').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('adds aggregation as participant via dropdown', async () => {
+    const user = userEvent.setup();
+    const aggRelId = useERDStore.getState().addRelationship('inner', [
+      { entityId: e1id, cardinality: { min: 1, max: 1 } },
+      { entityId: e2id, cardinality: { min: 0, max: '*' } },
+    ], { x: 0, y: 0 });
+    const aggId = useERDStore.getState().addAggregation('MyAgg', aggRelId);
+
+    render(<RelationshipProperties relationship={getRel(relId)} />);
+
+    await user.selectOptions(screen.getByTestId('new-participant-select'), `agg:${aggId}`);
+    await user.click(screen.getByTestId('add-participant-button'));
+
+    const updated = getRel(relId);
+    expect(updated.participants).toHaveLength(3);
+    expect(updated.participants[2].isAggregation).toBe(true);
+    expect(updated.participants[2].entityId).toBe(aggId);
   });
 });

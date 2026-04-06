@@ -94,6 +94,50 @@ describe('Canvas rendering', () => {
   });
 });
 
+describe('Canvas selection highlighting', () => {
+  it('highlights a relationship node when selected', () => {
+    const e1 = useERDStore.getState().addEntity('A', { x: 0, y: 0 });
+    const e2 = useERDStore.getState().addEntity('B', { x: 200, y: 0 });
+    const relId = useERDStore.getState().addRelationship('R', [
+      { entityId: e1, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 100, y: 100 });
+    useERDStore.setState({ selection: { type: 'relationship', relationshipId: relId } });
+    expect(() => renderCanvas()).not.toThrow();
+  });
+
+  it('highlights a relAttribute node when selected', () => {
+    const e1 = useERDStore.getState().addEntity('A', { x: 0, y: 0 });
+    const e2 = useERDStore.getState().addEntity('B', { x: 200, y: 0 });
+    const relId = useERDStore.getState().addRelationship('R', [
+      { entityId: e1, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 100, y: 100 });
+    const attrId = useERDStore.getState().addRelationshipAttribute(relId, 'date', { name: 'DATE' });
+    useERDStore.setState({ selection: { type: 'relAttribute', relationshipId: relId, attributeId: attrId } });
+    expect(() => renderCanvas()).not.toThrow();
+  });
+
+  it('highlights an aggregation node when selected', () => {
+    const e1 = useERDStore.getState().addEntity('A', { x: 0, y: 0 });
+    const e2 = useERDStore.getState().addEntity('B', { x: 200, y: 0 });
+    const relId = useERDStore.getState().addRelationship('R', [
+      { entityId: e1, cardinality: { min: 1, max: 1 } },
+      { entityId: e2, cardinality: { min: 0, max: '*' } },
+    ], { x: 100, y: 100 });
+    const aggId = useERDStore.getState().addAggregation('AggR', relId);
+    useERDStore.setState({ selection: { type: 'aggregation', aggregationId: aggId } });
+    expect(() => renderCanvas()).not.toThrow();
+  });
+
+  it('highlights an attribute node when selected', () => {
+    const eid = useERDStore.getState().addEntity('E', { x: 0, y: 0 });
+    const attrId = useERDStore.getState().addAttribute(eid, 'col', { name: 'INT' });
+    useERDStore.setState({ selection: { type: 'attribute', entityId: eid, attributeId: attrId } });
+    expect(() => renderCanvas()).not.toThrow();
+  });
+});
+
 describe('Canvas pane click', () => {
   it('clicking pane clears selection', () => {
     const id = useERDStore.getState().addEntity('E', { x: 0, y: 0 });

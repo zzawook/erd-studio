@@ -11,6 +11,8 @@ export function RelationshipProperties({ relationship }: Props) {
   const model = useERDStore((s) => s.model);
   const updateRelationship = useERDStore((s) => s.updateRelationship);
   const updateParticipant = useERDStore((s) => s.updateParticipant);
+  const addParticipant = useERDStore((s) => s.addParticipant);
+  const removeParticipant = useERDStore((s) => s.removeParticipant);
   const deleteRelationship = useERDStore((s) => s.deleteRelationship);
   const addRelationshipAttribute = useERDStore((s) => s.addRelationshipAttribute);
   const setSelection = useERDStore((s) => s.setSelection);
@@ -18,6 +20,7 @@ export function RelationshipProperties({ relationship }: Props) {
   const [newAttrName, setNewAttrName] = useState('');
   const [cardErrors, setCardErrors] = useState<Record<number, string>>({});
   const [confirming, setConfirming] = useState(false);
+  const [newParticipantEntity, setNewParticipantEntity] = useState('');
 
   useEffect(() => {
     if (!confirming) return;
@@ -84,12 +87,32 @@ export function RelationshipProperties({ relationship }: Props) {
         <h4 className="font-semibold text-gray-700 mb-2 text-sm">Participants</h4>
         <div className="flex flex-col gap-2">
           {relationship.participants.map((p, i) => {
-            const entity = model.entities.find((e) => e.id === p.entityId);
+            const entity = p.isAggregation
+              ? undefined
+              : model.entities.find((e) => e.id === p.entityId);
+            const agg = p.isAggregation
+              ? model.aggregations.find((a) => a.id === p.entityId)
+              : undefined;
+            const displayName = p.isAggregation
+              ? (agg ? `[Agg] ${agg.name}` : 'Unknown')
+              : (entity?.name ?? 'Unknown');
             return (
               <div key={i} className="p-3 bg-gray-50 rounded-lg border-l-2 border-primary-400">
-                <div className="font-medium text-gray-700 mb-2 text-sm">
-                  {entity?.name ?? 'Unknown'}
-                  {p.role ? ` (${p.role})` : ''}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium text-gray-700 text-sm">
+                    {displayName}
+                    {p.role ? ` (${p.role})` : ''}
+                  </div>
+                  {relationship.participants.length > 2 && (
+                    <button
+                      onClick={() => removeParticipant(relationship.id, i)}
+                      className="text-red-400 hover:text-red-600 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 transition-colors"
+                      title="Remove participant"
+                      data-testid={`remove-participant-${i}`}
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -119,6 +142,42 @@ export function RelationshipProperties({ relationship }: Props) {
               </div>
             );
           })}
+        </div>
+
+        {/* Add participant */}
+        <div className="flex gap-2 mt-2">
+          <select
+            value={newParticipantEntity}
+            onChange={(e) => setNewParticipantEntity(e.target.value)}
+            className={`flex-1 ${inputClass}`}
+            data-testid="new-participant-select"
+          >
+            <option value="">Add entity...</option>
+            {model.entities.map((e) => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+            {model.aggregations.map((a) => (
+              <option key={`agg-${a.id}`} value={`agg:${a.id}`}>[Agg] {a.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              if (!newParticipantEntity) return;
+              const isAgg = newParticipantEntity.startsWith('agg:');
+              const entityId = isAgg ? newParticipantEntity.slice(4) : newParticipantEntity;
+              addParticipant(relationship.id, {
+                entityId,
+                cardinality: { min: 0, max: '*' },
+                isAggregation: isAgg,
+              });
+              setNewParticipantEntity('');
+            }}
+            disabled={!newParticipantEntity}
+            className="shrink-0 px-3 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="add-participant-button"
+          >
+            Add
+          </button>
         </div>
       </div>
 

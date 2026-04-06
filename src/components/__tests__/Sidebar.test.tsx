@@ -503,6 +503,66 @@ describe('Sidebar', () => {
     expect(newRel!.participants[1].entityId).toBe(e3id);
   });
 
+  // -----------------------------------------------------------------------
+  // N-ary relationship participants
+  // -----------------------------------------------------------------------
+
+  it('adds a third participant via the + Add Participant button', async () => {
+    const user = userEvent.setup();
+    useERDStore.getState().addEntity('A', { x: 0, y: 0 });
+    useERDStore.getState().addEntity('B', { x: 200, y: 0 });
+    useERDStore.getState().addEntity('C', { x: 400, y: 0 });
+
+    render(<Sidebar />);
+
+    // Should start with 2 participant rows
+    expect(screen.getByTestId('rel-participant-0')).toBeInTheDocument();
+    expect(screen.getByTestId('rel-participant-1')).toBeInTheDocument();
+
+    // Click "+ Add Participant"
+    await user.click(screen.getByTestId('rel-add-participant-button'));
+
+    // Now 3 participant rows
+    expect(screen.getByTestId('rel-participant-2')).toBeInTheDocument();
+  });
+
+  it('removes a participant when 3+ are present', async () => {
+    const user = userEvent.setup();
+    useERDStore.getState().addEntity('A', { x: 0, y: 0 });
+
+    render(<Sidebar />);
+
+    // Add a third participant
+    await user.click(screen.getByTestId('rel-add-participant-button'));
+    expect(screen.getByTestId('rel-participant-2')).toBeInTheDocument();
+
+    // Remove buttons should appear
+    await user.click(screen.getByTestId('rel-remove-participant-2'));
+    expect(screen.queryByTestId('rel-participant-2')).not.toBeInTheDocument();
+  });
+
+  it('creates a ternary relationship', async () => {
+    const user = userEvent.setup();
+    const e1id = useERDStore.getState().addEntity('A', { x: 0, y: 0 });
+    const e2id = useERDStore.getState().addEntity('B', { x: 200, y: 0 });
+    const e3id = useERDStore.getState().addEntity('C', { x: 400, y: 0 });
+
+    render(<Sidebar />);
+
+    await user.type(screen.getByTestId('rel-name-input'), 'ternary');
+    await user.click(screen.getByTestId('rel-add-participant-button'));
+
+    await user.selectOptions(screen.getByTestId('rel-entity1-select'), e1id);
+    await user.selectOptions(screen.getByTestId('rel-entity2-select'), e2id);
+    await user.selectOptions(screen.getByTestId('rel-entity3-select'), e3id);
+
+    await user.click(screen.getByTestId('add-relationship-button'));
+
+    const rels = useERDStore.getState().model.relationships;
+    expect(rels).toHaveLength(1);
+    expect(rels[0].participants).toHaveLength(3);
+  });
+
   it('shows aggregation options in relationship entity dropdowns', () => {
     const e1id = useERDStore.getState().addEntity('A', { x: 0, y: 0 });
     const e2id = useERDStore.getState().addEntity('B', { x: 200, y: 0 });
