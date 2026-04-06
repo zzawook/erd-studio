@@ -294,6 +294,6 @@ describe('MySQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('FOREIGN KEY (`id`) REFERENCES `Dept` (`id`)');
+    expect(result.ddl).toContain('FOREIGN KEY (`dept_id`) REFERENCES `Dept` (`id`)');
   });
 });
