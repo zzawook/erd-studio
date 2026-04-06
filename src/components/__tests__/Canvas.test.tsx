@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { Canvas, handleNodeDragStop, handleNodeClick } from '../Canvas';
+import { Canvas, handleNodeDragStop, handleNodeClick, syncChenAggregationPosition } from '../Canvas';
 import { useERDStore } from '../../ir/store';
 
 beforeAll(() => {
@@ -287,5 +287,57 @@ describe('Canvas onNodeClick integration', () => {
   it('clicking an unknown:: node returns null', () => {
     const sel = handleNodeClick('foobar::x1');
     expect(sel).toBeNull();
+  });
+});
+
+describe('syncChenAggregationPosition', () => {
+  const aggregations = [
+    { id: 'agg1', name: 'Enrollment', relationshipId: 'r1', position: { x: 100, y: 100 } },
+  ];
+
+  it('updates relationship position when dragging an agg:: node in chen notation', () => {
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    syncChenAggregationPosition('agg::agg1', { x: 200, y: 300 }, 'chen', aggregations, updateRelationship, updateAggregation);
+    expect(updateRelationship).toHaveBeenCalledWith('r1', { position: { x: 200, y: 300 } });
+    expect(updateAggregation).not.toHaveBeenCalled();
+  });
+
+  it('updates aggregation position when dragging a rel:: node in chen notation', () => {
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    syncChenAggregationPosition('rel::r1', { x: 50, y: 75 }, 'chen', aggregations, updateRelationship, updateAggregation);
+    expect(updateAggregation).toHaveBeenCalledWith('agg1', { position: { x: 50, y: 75 } });
+    expect(updateRelationship).not.toHaveBeenCalled();
+  });
+
+  it('does nothing in crowsfoot notation', () => {
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    syncChenAggregationPosition('agg::agg1', { x: 200, y: 300 }, 'crowsfoot', aggregations, updateRelationship, updateAggregation);
+    expect(updateRelationship).not.toHaveBeenCalled();
+    expect(updateAggregation).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for entity:: or attr:: nodes', () => {
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    syncChenAggregationPosition('entity::e1', { x: 10, y: 20 }, 'chen', aggregations, updateRelationship, updateAggregation);
+    expect(updateRelationship).not.toHaveBeenCalled();
+    expect(updateAggregation).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when agg:: id does not match any aggregation', () => {
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    syncChenAggregationPosition('agg::nonexistent', { x: 10, y: 20 }, 'chen', aggregations, updateRelationship, updateAggregation);
+    expect(updateRelationship).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when rel:: id does not match any aggregation', () => {
+    const updateRelationship = vi.fn();
+    const updateAggregation = vi.fn();
+    syncChenAggregationPosition('rel::r99', { x: 10, y: 20 }, 'chen', aggregations, updateRelationship, updateAggregation);
+    expect(updateAggregation).not.toHaveBeenCalled();
   });
 });

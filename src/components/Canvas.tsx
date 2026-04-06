@@ -24,7 +24,32 @@ import { ChenJunctionNode } from '../renderer/chen/nodes/ChenJunctionNode';
 import { ChenEdge } from '../renderer/chen/edges/ChenEdge';
 import { CrowsFootEntityNode } from '../renderer/crowsfoot/nodes/CrowsFootEntityNode';
 import { CrowsFootEdge } from '../renderer/crowsfoot/edges/CrowsFootEdge';
-import type { SelectionTarget } from '../ir/types';
+import type { SelectionTarget, Aggregation } from '../ir/types';
+
+/**
+ * Sync aggregation and relationship positions in Chen notation.
+ * When an aggregation box is dragged, the underlying relationship diamond must follow,
+ * and vice versa, so the box always wraps the diamond.
+ */
+export function syncChenAggregationPosition(
+  nodeId: string,
+  position: { x: number; y: number },
+  notation: string,
+  aggregations: Aggregation[],
+  updateRelationship: (id: string, patch: { position: { x: number; y: number } }) => void,
+  updateAggregation: (id: string, patch: { position: { x: number; y: number } }) => void,
+) {
+  if (notation !== 'chen') return;
+  const kind = nodeId.split('::')[0];
+  const id = nodeId.split('::')[1];
+  if (kind === 'agg') {
+    const agg = aggregations.find((a) => a.id === id);
+    if (agg) updateRelationship(agg.relationshipId, { position });
+  } else if (kind === 'rel') {
+    const agg = aggregations.find((a) => a.relationshipId === id);
+    if (agg) updateAggregation(agg.id, { position });
+  }
+}
 
 const chenNodeTypes: NodeTypes = {
   chenEntity: ChenEntityNode,
@@ -149,20 +174,10 @@ export function Canvas() {
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
       handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
-      const id = node.id.split('::')[1];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
       }
-      // In Chen notation, keep aggregation box and relationship diamond in sync
-      if (notation === 'chen') {
-        if (kind === 'agg') {
-          const agg = model.aggregations.find((a) => a.id === id);
-          if (agg) updateRelationship(agg.relationshipId, { position: node.position });
-        } else if (kind === 'rel') {
-          const agg = model.aggregations.find((a) => a.relationshipId === id);
-          if (agg) updateAggregation(agg.id, { position: node.position });
-        }
-      }
+      syncChenAggregationPosition(node.id, node.position, notation, model.aggregations, updateRelationship, updateAggregation);
     },
     [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition, notation, model.aggregations]
   );
@@ -171,20 +186,10 @@ export function Canvas() {
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
       handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
-      const id = node.id.split('::')[1];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
       }
-      // In Chen notation, keep aggregation box and relationship diamond in sync
-      if (notation === 'chen') {
-        if (kind === 'agg') {
-          const agg = model.aggregations.find((a) => a.id === id);
-          if (agg) updateRelationship(agg.relationshipId, { position: node.position });
-        } else if (kind === 'rel') {
-          const agg = model.aggregations.find((a) => a.relationshipId === id);
-          if (agg) updateAggregation(agg.id, { position: node.position });
-        }
-      }
+      syncChenAggregationPosition(node.id, node.position, notation, model.aggregations, updateRelationship, updateAggregation);
       // Select the dragged node
       const sel = handleNodeClick(node.id);
       setSelection(sel);
