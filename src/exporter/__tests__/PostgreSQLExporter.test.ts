@@ -4120,4 +4120,60 @@ describe('N-ary Relationships', () => {
     expect(ddl).toContain('REFERENCES "Instructor"');
     expect(ddl).toContain('REFERENCES "Semester"');
   });
+
+  // -----------------------------------------------------------------------
+  // Edge cases for n-ary junction table with missing participants
+  // -----------------------------------------------------------------------
+
+  it('produces empty junction table when all participants reference nonexistent entities', () => {
+    const model: ERDModel = {
+      entities: [],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'Ghost',
+          participants: [
+            { entityId: 'missing1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'missing2', cardinality: { min: 0, max: '*' } },
+            { entityId: 'missing3', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Junction table created but with no columns
+    expect(result.ddl).toContain('CREATE TABLE "Ghost"');
+  });
+
+  it('warns about relationship with fewer than 2 participants', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Lone',
+          attributes: [makeAttr({ id: 'a1', name: 'lid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'incomplete',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    expect(result.warnings).toContain('Relationship "incomplete" has fewer than 2 participants');
+  });
 });

@@ -96,6 +96,18 @@ describe('ExportDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('closes when Escape key is pressed', () => {
+    render(<ExportDialog onClose={onClose} />);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not close on non-Escape keydown', () => {
+    render(<ExportDialog onClose={onClose} />);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('renders copy and download buttons', () => {
     render(<ExportDialog onClose={onClose} />);
     expect(screen.getByTestId('copy-button')).toHaveTextContent('Copy to Clipboard');

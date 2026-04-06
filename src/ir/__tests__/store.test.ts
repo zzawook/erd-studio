@@ -1259,6 +1259,13 @@ describe('Aggregation CRUD', () => {
     expect(sel?.type).toBe('entity');
   });
 
+  it('deleteAggregation clears selection when deleting the selected aggregation', () => {
+    const aggId = state().addAggregation('AggR', relId);
+    state().setSelection({ type: 'aggregation', aggregationId: aggId });
+    state().deleteAggregation(aggId);
+    expect(state().selection).toBeNull();
+  });
+
   it('deleteEntity cascades to remove relationships and their aggregations', () => {
     state().addAggregation('AggR', relId);
     expect(state().model.aggregations).toHaveLength(1);
