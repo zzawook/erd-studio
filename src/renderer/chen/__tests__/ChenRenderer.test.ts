@@ -550,10 +550,10 @@ describe('ChenRenderer', () => {
     // Width/height match REL_W=120, REL_H=80
     expect(aggNode?.data?.width).toBe(120);
     expect(aggNode?.data?.height).toBe(80);
-    // Position matches the aggregation's persisted position
+    // Position matches the relationship's position (box wraps the diamond)
     expect(aggNode?.position).toEqual({ x: 150, y: 100 });
-    // Not draggable, zIndex=-1
-    expect(aggNode?.draggable).toBe(false);
+    // Draggable (drags relationship diamond with it), zIndex=-1
+    expect(aggNode?.draggable).toBe(true);
     expect(aggNode?.style).toEqual({ zIndex: -1 });
   });
 

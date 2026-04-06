@@ -149,25 +149,47 @@ export function Canvas() {
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
       handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
+      const id = node.id.split('::')[1];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
       }
+      // In Chen notation, keep aggregation box and relationship diamond in sync
+      if (notation === 'chen') {
+        if (kind === 'agg') {
+          const agg = model.aggregations.find((a) => a.id === id);
+          if (agg) updateRelationship(agg.relationshipId, { position: node.position });
+        } else if (kind === 'rel') {
+          const agg = model.aggregations.find((a) => a.relationshipId === id);
+          if (agg) updateAggregation(agg.id, { position: node.position });
+        }
+      }
     },
-    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition]
+    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition, notation, model.aggregations]
   );
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
       handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
+      const id = node.id.split('::')[1];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
+      }
+      // In Chen notation, keep aggregation box and relationship diamond in sync
+      if (notation === 'chen') {
+        if (kind === 'agg') {
+          const agg = model.aggregations.find((a) => a.id === id);
+          if (agg) updateRelationship(agg.relationshipId, { position: node.position });
+        } else if (kind === 'rel') {
+          const agg = model.aggregations.find((a) => a.relationshipId === id);
+          if (agg) updateAggregation(agg.id, { position: node.position });
+        }
       }
       // Select the dragged node
       const sel = handleNodeClick(node.id);
       setSelection(sel);
     },
-    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition, setSelection]
+    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition, setSelection, notation, model.aggregations]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
