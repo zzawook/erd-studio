@@ -7,6 +7,7 @@ interface FKConstraint {
   columns: string[];
   refTable: string;
   refColumns: string[];
+  onDelete?: 'CASCADE' | 'SET NULL';
 }
 
 interface TableDef {
@@ -62,6 +63,9 @@ export abstract class BaseExporter implements Exporter {
     // Track merge candidates: entityName -> relName[]
     const mergeCandidates = new Map<string, string[]>();
 
+    // Collect relationship IDs that are wrapped by an aggregation
+    const aggregatedRelIds = new Set(model.aggregations.map((a) => a.relationshipId));
+
     // Handle M:N relationships (junction tables)
     for (const rel of model.relationships) {
       if (rel.participants.length < 2) {
@@ -70,10 +74,10 @@ export abstract class BaseExporter implements Exporter {
       }
       if (rel.isIdentifying) continue; // Already handled in weak entity logic
       if (this.needsJunctionTable(rel)) {
-        tables.push(this.buildJunctionTable(rel, model, warnings));
+        tables.push(this.buildJunctionTable(rel, model, warnings, aggregatedRelIds.has(rel.id)));
       } else {
         // 1:N or 1:1 → add FK to appropriate table
-        const mergeInfo = this.addRelationshipFKs(rel, model, tables, warnings);
+        const mergeInfo = this.addRelationshipFKs(rel, model, tables, warnings, aggregatedRelIds.has(rel.id));
         if (mergeInfo) {
           const existing = mergeCandidates.get(mergeInfo.entityName);
           if (existing) {
@@ -231,7 +235,9 @@ export abstract class BaseExporter implements Exporter {
           primaryKey.push(attr.name);
         }
       }
-    } else {
+    } else if (!(entity.isWeak && entity.attributes.some((a) => a.isPartialKey))) {
+      // Weak entities with partial keys get their PK from the identifying
+      // relationship (owner PK + partial key), so skip the warning for them.
       warnings.push(`Entity "${entity.name}" has no primary key`);
     }
 
@@ -242,6 +248,11 @@ export abstract class BaseExporter implements Exporter {
         .filter((n): n is string => n != null);
       if (attrs.length > 0) {
         uniqueConstraints.push(attrs);
+        // Candidate keys must be NOT NULL
+        for (const attrName of attrs) {
+          const col = columns.find((c) => c.name === attrName);
+          if (col) col.nullable = false;
+        }
       }
     }
 
@@ -256,29 +267,43 @@ export abstract class BaseExporter implements Exporter {
         if (owner) {
           const ownerPk = owner.candidateKeys.find((ck) => ck.isPrimary);
           if (ownerPk) {
+            // Check for column name collisions between owner PK attrs and existing columns
+            const existingColNames = new Set(columns.map((c) => c.name));
+            const fkColNames: string[] = [];
+
             for (const attrId of ownerPk.attributeIds) {
               const attr = owner.attributes.find((a) => a.id === attrId);
               if (attr) {
-                const fkColName = fkColumnName(owner.name, attr.name);
+                const baseName = fkColumnName(owner.name, attr.name);
+                const fkColName = existingColNames.has(baseName)
+                  ? `${owner.name.toLowerCase()}_${attr.name}`
+                  : baseName;
                 columns.push({
                   name: fkColName,
                   type: this.mapDataType(attr.dataType),
                   nullable: false,
                 });
                 primaryKey.push(fkColName);
+                fkColNames.push(fkColName);
               }
             }
             foreignKeys.push({
               tableName: entity.name,
-              columns: ownerPk.attributeIds
-                .map((id) => owner.attributes.find((a) => a.id === id))
-                .filter((a): a is Attribute => a != null)
-                .map((a) => fkColumnName(owner.name, a.name)),
+              columns: fkColNames,
               refTable: owner.name,
               refColumns: ownerPk.attributeIds
                 .map((id) => owner.attributes.find((a) => a.id === id)?.name)
                 .filter((n): n is string => n != null),
+              onDelete: 'CASCADE',
             });
+          }
+        }
+
+        // Include partial key attributes in the primary key for weak entities.
+        // A weak entity's full PK = owner's PK (added above) + the weak entity's partial key.
+        for (const attr of entity.attributes) {
+          if (attr.isPartialKey && !primaryKey.includes(attr.name)) {
+            primaryKey.push(attr.name);
           }
         }
       } else {
@@ -339,7 +364,7 @@ export abstract class BaseExporter implements Exporter {
     return isMany(rel.participants[0].cardinality) && isMany(rel.participants[1].cardinality);
   }
 
-  private buildJunctionTable(rel: Relationship, model: ERDModel, _warnings: string[]): TableDef {
+  private buildJunctionTable(rel: Relationship, model: ERDModel, _warnings: string[], isAggregated = false): TableDef {
     // Resolve all participant entities (including through aggregations)
     const participantEntities: Entity[] = [];
     for (const p of rel.participants) {
@@ -396,6 +421,7 @@ export abstract class BaseExporter implements Exporter {
         columns: fkCols,
         refTable: entity.name,
         refColumns: refCols,
+        ...(isAggregated ? { onDelete: 'SET NULL' as const } : {}),
       });
     }
 
@@ -435,6 +461,7 @@ export abstract class BaseExporter implements Exporter {
     model: ERDModel,
     tables: TableDef[],
     warnings: string[],
+    isAggregated = false,
   ): { entityName: string; relName: string } | null {
     if (rel.participants.length < 2) return null;
     if (rel.isIdentifying) return null; // Already handled in weak entity logic
@@ -473,6 +500,7 @@ export abstract class BaseExporter implements Exporter {
           columns: fkCols,
           refTable: fkEntity.name,
           refColumns: refCols,
+          ...(isAggregated ? { onDelete: 'SET NULL' as const } : {}),
         });
         return null; // No merge for self-referencing
       }
@@ -518,6 +546,7 @@ export abstract class BaseExporter implements Exporter {
       columns: fkCols,
       refTable: refEntity.name,
       refColumns: refCols,
+      ...(isAggregated ? { onDelete: 'SET NULL' as const } : {}),
     });
 
     return hasTotalParticipation ? { entityName: fkEntity.name, relName: rel.name } : null;
@@ -581,9 +610,11 @@ export abstract class BaseExporter implements Exporter {
     }
 
     for (const fk of table.foreignKeys) {
-      lines.push(
-        `  FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')})`
-      );
+      let fkLine = `  FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')})`;
+      if (fk.onDelete) {
+        fkLine += ` ON DELETE ${fk.onDelete}`;
+      }
+      lines.push(fkLine);
     }
 
     return `CREATE TABLE ${q(table.name)} (\n${lines.join(',\n')}\n);`;
@@ -591,6 +622,10 @@ export abstract class BaseExporter implements Exporter {
 
   private generateAlterTableFK(fk: FKConstraint): string {
     const q = (n: string) => this.quoteIdentifier(n);
-    return `ALTER TABLE ${q(fk.tableName)} ADD FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')});`;
+    let stmt = `ALTER TABLE ${q(fk.tableName)} ADD FOREIGN KEY (${fk.columns.map(q).join(', ')}) REFERENCES ${q(fk.refTable)} (${fk.refColumns.map(q).join(', ')})`;
+    if (fk.onDelete) {
+      stmt += ` ON DELETE ${fk.onDelete}`;
+    }
+    return `${stmt};`;
   }
 }

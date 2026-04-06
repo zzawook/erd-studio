@@ -60,6 +60,25 @@ export function AttributeProperties({ attribute, entityId, relationshipId, conte
       update({ isPartialKey: true });
       updateEntity(entityId, { isWeak: true });
 
+      // Demote any existing primary key — weak entities derive PK from identifying relationship
+      const entity = model.entities.find((e) => e.id === entityId);
+      const existingPk = entity?.candidateKeys.find((ck) => ck.isPrimary);
+      if (existingPk) {
+        useERDStore.setState((state) => ({
+          model: {
+            ...state.model,
+            entities: state.model.entities.map((e) =>
+              e.id === entityId
+                ? {
+                    ...e,
+                    candidateKeys: e.candidateKeys.map((ck) => ({ ...ck, isPrimary: false })),
+                  }
+                : e
+            ),
+          },
+        }));
+      }
+
       // Auto-mark identifying relationship if not already set
       if (!pkInfo.hasIdentifying) {
         const connectedRels = model.relationships.filter(

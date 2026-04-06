@@ -15,7 +15,7 @@ export function ChenAggregationNode({ data, selected }: NodeProps<ChenAggregatio
 
   return (
     <div
-      className={`border-2 border-dashed border-gray-600 bg-gray-50/40 rounded-sm relative
+      className={`border-2 border-gray-600 bg-gray-50/40 rounded-sm relative
         ${selected ? 'ring-2 ring-primary-500 ring-offset-2' : ''}`}
       style={{ width, height }}
       data-testid="chen-aggregation-node"

@@ -60,8 +60,9 @@ export function CandidateKeyProperties({ entity }: Props) {
                 name={`pk-${entity.id}`}
                 checked={ck.isPrimary}
                 onChange={() => setPrimaryKey(entity.id, ck.id)}
-                title="Set as Primary Key"
-                className="text-primary-600 focus:ring-primary-500"
+                disabled={entity.isWeak}
+                title={entity.isWeak ? "Weak entities derive PK from identifying relationship" : "Set as Primary Key"}
+                className="text-primary-600 focus:ring-primary-500 disabled:opacity-50"
                 data-testid={`ck-primary-radio-${ck.id}`}
               />
               <span className={`flex-1 text-sm ${ck.isPrimary ? 'font-semibold text-gray-800' : 'text-gray-700'}`}>
@@ -118,16 +119,22 @@ export function CandidateKeyProperties({ entity }: Props) {
             ))}
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-gray-600 py-1">
+          <label className={`flex items-center gap-2 text-sm py-1 ${entity.isWeak ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600'}`}>
             <input
               type="checkbox"
               checked={isPrimary}
               onChange={(e) => setIsPrimary(e.target.checked)}
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              disabled={entity.isWeak}
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
               data-testid="ck-primary-checkbox"
             />
             Primary Key
           </label>
+          {entity.isWeak && (
+            <p className="text-xs text-amber-600 ml-1">
+              Weak entities derive their PK from the identifying relationship + partial key
+            </p>
+          )}
 
           <div className="flex gap-2">
             <button
