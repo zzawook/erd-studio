@@ -524,18 +524,23 @@ export abstract class BaseExporter implements Exporter {
     const fkCols: string[] = [];
     const refCols: string[] = [];
 
+    // Snapshot existing column names to detect collisions with FK columns
+    const existingColNames = new Set(fkTable.columns.map((c) => c.name));
+
     for (const attrId of refPk.attributeIds) {
       const attr = refEntity.attributes.find((a) => a.id === attrId);
       if (attr) {
-        const colName = fkColumnName(refEntity.name, attr.name);
-        // Avoid duplicate columns
-        if (!fkTable.columns.some((c) => c.name === colName)) {
-          fkTable.columns.push({
-            name: colName,
-            type: this.mapDataType(attr.dataType),
-            nullable: !hasTotalParticipation,
-          });
-        }
+        const baseName = fkColumnName(refEntity.name, attr.name);
+        // If the FK column name collides with an existing column (e.g., the entity's own PK),
+        // prefix with the referenced entity name to disambiguate
+        const colName = existingColNames.has(baseName)
+          ? `${refEntity.name.toLowerCase()}_${attr.name}`
+          : baseName;
+        fkTable.columns.push({
+          name: colName,
+          type: this.mapDataType(attr.dataType),
+          nullable: !hasTotalParticipation,
+        });
         fkCols.push(colName);
         refCols.push(attr.name);
       }

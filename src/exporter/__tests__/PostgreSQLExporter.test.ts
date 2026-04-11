@@ -289,8 +289,9 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    expect(result.ddl).toContain('"id" INTEGER');
-    expect(result.ddl).toContain('FOREIGN KEY ("id") REFERENCES "Department" ("id")');
+    const empTable = result.ddl.split('CREATE TABLE "Employee"')[1];
+    expect(empTable).toContain('"department_id" INTEGER');
+    expect(empTable).toContain('FOREIGN KEY ("department_id") REFERENCES "Department" ("id")');
     // Department table should be created before Employee (topo sort)
     const deptPos = result.ddl.indexOf('CREATE TABLE "Department"');
     const empPos = result.ddl.indexOf('CREATE TABLE "Employee"');
@@ -335,8 +336,8 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // Passport has max=1 → FK side; Passport min=1 → total participation → merge
     const passportTable = result.ddl.split('CREATE TABLE "Passport_has_passport"')[1];
-    expect(passportTable).toContain('FOREIGN KEY ("id") REFERENCES "Person" ("id")');
-    expect(passportTable).toContain('"id" INTEGER NOT NULL');
+    expect(passportTable).toContain('FOREIGN KEY ("person_id") REFERENCES "Person" ("id")');
+    expect(passportTable).toContain('"person_id" INTEGER NOT NULL');
   });
 
   // -----------------------------------------------------------------------
@@ -377,7 +378,8 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // "Beta" > "Alpha" alphabetically so Beta gets the FK
     const betaTable = result.ddl.split('CREATE TABLE "Beta"')[1];
-    expect(betaTable).toContain('FOREIGN KEY ("id") REFERENCES "Alpha" ("id")');
+    expect(betaTable).toContain('"alpha_id" INTEGER');
+    expect(betaTable).toContain('FOREIGN KEY ("alpha_id") REFERENCES "Alpha" ("id")');
   });
 
   // -----------------------------------------------------------------------
@@ -1139,7 +1141,8 @@ describe('PostgreSQLExporter', () => {
     };
     const result = exporter.export(model);
     const orderTable = result.ddl.split('CREATE TABLE "Order"')[1];
-    expect(orderTable).toContain('FOREIGN KEY ("id") REFERENCES "Customer" ("id")');
+    expect(orderTable).toContain('"customer_id" INTEGER');
+    expect(orderTable).toContain('FOREIGN KEY ("customer_id") REFERENCES "Customer" ("id")');
   });
 
   it('adds FK column when name does not collide with existing columns', () => {
@@ -1215,13 +1218,432 @@ describe('PostgreSQLExporter', () => {
       aggregations: [],
     };
     const result = exporter.export(model);
-    // Order already has "id" column; FK from Customer is also "id"
-    // The duplicate column should not be added again
+    // Order already has "id" column; FK from Customer's "id" should be prefixed
     const orderDDL = result.ddl.split('CREATE TABLE "Order"')[1];
-    const idCount = (orderDDL.match(/"id"/g) || []).length;
-    // "id" appears in: column def, PRIMARY KEY, FOREIGN KEY columns, REFERENCES — but only one column definition
-    expect(orderDDL).toContain('FOREIGN KEY ("id") REFERENCES "Customer" ("id")');
-    expect(idCount).toBeGreaterThanOrEqual(3); // col def + PK + FK ref
+    expect(orderDDL).toContain('"customer_id" INTEGER');
+    expect(orderDDL).toContain('FOREIGN KEY ("customer_id") REFERENCES "Customer" ("id")');
+    expect(orderDDL).toContain('PRIMARY KEY ("id")');
+  });
+
+  // -----------------------------------------------------------------------
+  // FK column name collision — comprehensive tests (issue #22)
+  // -----------------------------------------------------------------------
+
+  it('prefixes FK column for 1:1 with same PK name (issue #22 scenario)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Tutor',
+          attributes: [makeAttr({ id: 'a1', name: 'name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a2', name: 'name', dataType: { name: 'VARCHAR', precision: 255 }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'Coaches',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // "Tutor" > "Student" alphabetically, so Tutor gets the FK
+    const tutorTable = result.ddl.split('CREATE TABLE "Tutor"')[1];
+    expect(tutorTable).toContain('"student_name" VARCHAR(255)');
+    expect(tutorTable).toContain('PRIMARY KEY ("name")');
+    expect(tutorTable).toContain('FOREIGN KEY ("student_name") REFERENCES "Student" ("name")');
+  });
+
+  it('prefixes FK column for 1:N with same PK name', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Department',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'works_in',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const empTable = result.ddl.split('CREATE TABLE "Employee"')[1];
+    // Employee keeps its own "id" as PK and gets a separate "department_id" FK column
+    expect(empTable).toContain('PRIMARY KEY ("id")');
+    expect(empTable).toContain('"department_id" INTEGER');
+    expect(empTable).toContain('FOREIGN KEY ("department_id") REFERENCES "Department" ("id")');
+  });
+
+  it('does not prefix FK column when PK names differ (no collision)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Person',
+          attributes: [makeAttr({ id: 'a1', name: 'pid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Passport',
+          attributes: [makeAttr({ id: 'a2', name: 'passport_no', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'holds',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // "Person" > "Passport" → Person gets the FK; no collision since "passport_no" != "pid"
+    const personTable = result.ddl.split('CREATE TABLE "Person"')[1];
+    expect(personTable).toContain('"passport_no" INTEGER');
+    expect(personTable).toContain('FOREIGN KEY ("passport_no") REFERENCES "Passport" ("passport_no")');
+    // Should NOT have a prefixed column
+    expect(personTable).not.toContain('"passport_passport_no"');
+  });
+
+  it('prefixes only colliding attributes in composite PK (partial collision)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'A',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a2', name: 'code', dataType: { name: 'INT' }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1', 'a2'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'B',
+          attributes: [
+            makeAttr({ id: 'a3', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a4', name: 'bname', dataType: { name: 'VARCHAR', precision: 100 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a3', 'a4'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'rel',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // B > A alphabetically → B gets FK. "id" collides → "a_id"; "code" doesn't → "code"
+    const bTable = result.ddl.split('CREATE TABLE "B"')[1];
+    expect(bTable).toContain('"a_id" INTEGER');
+    expect(bTable).toContain('"code" INTEGER');
+    expect(bTable).toContain('FOREIGN KEY ("a_id", "code") REFERENCES "A" ("id", "code")');
+  });
+
+  it('prefixes all attributes in composite PK when all collide (full collision)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'A',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a2', name: 'name', dataType: { name: 'VARCHAR', precision: 100 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a1', 'a2'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'B',
+          attributes: [
+            makeAttr({ id: 'a3', name: 'id', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a4', name: 'name', dataType: { name: 'VARCHAR', precision: 100 }, nullable: false }),
+          ],
+          candidateKeys: [makePK(['a3', 'a4'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'rel',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // B > A → B gets FK. Both "id" and "name" collide → "a_id", "a_name"
+    const bTable = result.ddl.split('CREATE TABLE "B"')[1];
+    expect(bTable).toContain('"a_id" INTEGER');
+    expect(bTable).toContain('"a_name" VARCHAR(100)');
+    expect(bTable).toContain('FOREIGN KEY ("a_id", "a_name") REFERENCES "A" ("id", "name")');
+  });
+
+  it('prefixes FK column correctly with total participation and table merge', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Badge',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'has_badge',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Badge has min=1 → total participation → merge to Badge_has_badge
+    expect(result.ddl).toContain('CREATE TABLE "Badge_has_badge"');
+    const badgeTable = result.ddl.split('CREATE TABLE "Badge_has_badge"')[1];
+    expect(badgeTable).toContain('PRIMARY KEY ("id")');
+    expect(badgeTable).toContain('"employee_id" INTEGER NOT NULL');
+    expect(badgeTable).toContain('FOREIGN KEY ("employee_id") REFERENCES "Employee" ("id")');
+  });
+
+  it('self-referencing 1:1 still uses ref_ prefix (not affected by collision fix)', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Employee',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'manages',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    const empTable = result.ddl.split('CREATE TABLE "Employee"')[1];
+    expect(empTable).toContain('"ref_id" INTEGER');
+    expect(empTable).toContain('FOREIGN KEY ("ref_id") REFERENCES "Employee" ("id")');
+  });
+
+  it('handles multiple relationships where some FK columns collide and some do not', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Student',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Course',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+        makeEntity({
+          id: 'e3',
+          name: 'Advisor',
+          attributes: [makeAttr({ id: 'a3', name: 'aid', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a3'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'enrolls',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+        {
+          id: 'r2',
+          name: 'advises',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e3', cardinality: { min: 0, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Course (max=1) gets FK to Student: "id" collides → "student_id"
+    const courseTable = result.ddl.split('CREATE TABLE "Course"')[1];
+    expect(courseTable).toContain('"student_id" INTEGER');
+    expect(courseTable).toContain('FOREIGN KEY ("student_id") REFERENCES "Student" ("id")');
+    // Advisor (max=1) gets FK to Student: "id" doesn't collide with "aid" → plain "id"
+    const advisorTable = result.ddl.split('CREATE TABLE "Advisor"')[1];
+    expect(advisorTable).toContain('FOREIGN KEY ("id") REFERENCES "Student" ("id")');
+    expect(advisorTable).not.toContain('"student_id"');
+  });
+
+  it('prefixes FK when collision is with a non-PK column', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'Order',
+          attributes: [
+            makeAttr({ id: 'a1', name: 'oid', dataType: { name: 'INT' }, nullable: false }),
+            makeAttr({ id: 'a3', name: 'customer_id', dataType: { name: 'INT' } }),
+          ],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'Customer',
+          attributes: [makeAttr({ id: 'a2', name: 'customer_id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'places',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: 1 } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // Order already has non-PK column "customer_id"; FK from Customer also named "customer_id"
+    const orderDDL = result.ddl.split('CREATE TABLE "Order"')[1];
+    expect(orderDDL).toContain('"customer_customer_id" INTEGER');
+    expect(orderDDL).toContain('FOREIGN KEY ("customer_customer_id") REFERENCES "Customer" ("customer_id")');
+  });
+
+  it('total participation FK column with collision is NOT NULL', () => {
+    const model: ERDModel = {
+      entities: [
+        makeEntity({
+          id: 'e1',
+          name: 'B',
+          attributes: [makeAttr({ id: 'a1', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a1'])],
+        }),
+        makeEntity({
+          id: 'e2',
+          name: 'A',
+          attributes: [makeAttr({ id: 'a2', name: 'id', dataType: { name: 'INT' }, nullable: false })],
+          candidateKeys: [makePK(['a2'])],
+        }),
+      ],
+      relationships: [
+        {
+          id: 'r1',
+          name: 'rel',
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 1, max: 1 } },
+          ],
+          isIdentifying: false,
+          attributes: [],
+          position: { x: 0, y: 0 },
+        },
+      ],
+      aggregations: [],
+    };
+    const result = exporter.export(model);
+    // A has max=1 → FK side, min=1 → total participation → NOT NULL + merge
+    const aTable = result.ddl.split(/CREATE TABLE "A[^"]*"/)[1];
+    expect(aTable).toContain('"b_id" INTEGER NOT NULL');
+    expect(aTable).toContain('FOREIGN KEY ("b_id") REFERENCES "B" ("id")');
   });
 
   // -----------------------------------------------------------------------
@@ -1262,8 +1684,8 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // A has min=1 → total participation; both max=1, A (min=1) gets FK → merge
     const aTable = result.ddl.split('CREATE TABLE "A_rel"')[1];
-    expect(aTable).toContain('FOREIGN KEY ("id") REFERENCES "B" ("id")');
-    expect(aTable).toContain('"id" INTEGER NOT NULL');
+    expect(aTable).toContain('FOREIGN KEY ("b_id") REFERENCES "B" ("id")');
+    expect(aTable).toContain('"b_id" INTEGER NOT NULL');
   });
 
   // -----------------------------------------------------------------------
@@ -1726,7 +2148,8 @@ describe('PostgreSQLExporter', () => {
     const result = exporter.export(model);
     // "Dog" > "Cat" alphabetically so Dog gets the FK
     const dogTable = result.ddl.split('CREATE TABLE "Dog"')[1];
-    expect(dogTable).toContain('FOREIGN KEY ("id") REFERENCES "Cat" ("id")');
+    expect(dogTable).toContain('"cat_id" INTEGER');
+    expect(dogTable).toContain('FOREIGN KEY ("cat_id") REFERENCES "Cat" ("id")');
   });
 
   it('handles junction table when entities are not found', () => {
@@ -2735,7 +3158,8 @@ describe('PostgreSQLExporter', () => {
     // Order has max=1 → FK side, min=1 → merge; FK column "id" collides with Order's "id"
     expect(result.ddl).toContain('CREATE TABLE "Order_places"');
     const orderTable = result.ddl.split('CREATE TABLE "Order_places"')[1];
-    expect(orderTable).toContain('FOREIGN KEY ("id") REFERENCES "Customer" ("id")');
+    expect(orderTable).toContain('"customer_id" INTEGER NOT NULL');
+    expect(orderTable).toContain('FOREIGN KEY ("customer_id") REFERENCES "Customer" ("id")');
   });
 
   it('handles merge with multivalued attribute table referencing merged entity', () => {
