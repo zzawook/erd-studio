@@ -25,7 +25,32 @@ import { ChenEdge } from '../renderer/chen/edges/ChenEdge';
 import { CrowsFootEntityNode } from '../renderer/crowsfoot/nodes/CrowsFootEntityNode';
 import { CrowsFootRelationshipNode } from '../renderer/crowsfoot/nodes/CrowsFootRelationshipNode';
 import { CrowsFootEdge } from '../renderer/crowsfoot/edges/CrowsFootEdge';
-import type { SelectionTarget } from '../ir/types';
+import type { SelectionTarget, Aggregation } from '../ir/types';
+
+/**
+ * Sync aggregation and relationship positions in Chen notation.
+ * When an aggregation box is dragged, the underlying relationship diamond must follow,
+ * and vice versa, so the box always wraps the diamond.
+ */
+export function syncChenAggregationPosition(
+  nodeId: string,
+  position: { x: number; y: number },
+  notation: string,
+  aggregations: Aggregation[],
+  updateRelationship: (id: string, patch: { position: { x: number; y: number } }) => void,
+  updateAggregation: (id: string, patch: { position: { x: number; y: number } }) => void,
+) {
+  if (notation !== 'chen') return;
+  const kind = nodeId.split('::')[0];
+  const id = nodeId.split('::')[1];
+  if (kind === 'agg') {
+    const agg = aggregations.find((a) => a.id === id);
+    if (agg) updateRelationship(agg.relationshipId, { position });
+  } else if (kind === 'rel') {
+    const agg = aggregations.find((a) => a.relationshipId === id);
+    if (agg) updateAggregation(agg.id, { position });
+  }
+}
 
 const chenNodeTypes: NodeTypes = {
   chenEntity: ChenEntityNode,
@@ -53,14 +78,24 @@ export function handleNodeDragStop(
   position: { x: number; y: number },
   updateEntity: (id: string, patch: { position: { x: number; y: number } }) => void,
   updateRelationship: (id: string, patch: { position: { x: number; y: number } }) => void,
+  updateAggregation?: (id: string, patch: { position: { x: number; y: number } }) => void,
+  aggregationIds?: Set<string>,
 ) {
   const parts = nodeId.split('::');
   const kind = parts[0];
   const id = parts[1];
   if (kind === 'entity') {
-    updateEntity(id, { position });
+    // In crow's foot notation, aggregation nodes use entity:: prefix.
+    // Check if this ID belongs to an aggregation before updating entity.
+    if (aggregationIds?.has(id) && updateAggregation) {
+      updateAggregation(id, { position });
+    } else {
+      updateEntity(id, { position });
+    }
   } else if (kind === 'rel') {
     updateRelationship(id, { position });
+  } else if (kind === 'agg' && updateAggregation) {
+    updateAggregation(id, { position });
   }
 }
 
@@ -98,8 +133,15 @@ export function Canvas() {
   const setSelection = useERDStore((s) => s.setSelection);
   const updateEntity = useERDStore((s) => s.updateEntity);
   const updateRelationship = useERDStore((s) => s.updateRelationship);
+  const updateAggregation = useERDStore((s) => s.updateAggregation);
   const nodePositions = useERDStore((s) => s.nodePositions);
   const setNodePosition = useERDStore((s) => s.setNodePosition);
+
+  // Build a set of aggregation IDs so drag handler can distinguish them from entities
+  const aggregationIds = useMemo(
+    () => new Set(model.aggregations.map((a) => a.id)),
+    [model.aggregations],
+  );
 
   const renderer = notation === 'chen' ? chenRenderer : crowsFootRenderer;
   const rendered = useMemo(() => renderer.render(model, nodePositions), [model, notation, nodePositions]);
@@ -132,27 +174,29 @@ export function Canvas() {
   // Update positions in store during drag so junction dots follow in real-time
   const onNodeDrag = useCallback(
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
-      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship);
+      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
       }
+      syncChenAggregationPosition(node.id, node.position, notation, model.aggregations, updateRelationship, updateAggregation);
     },
-    [updateEntity, updateRelationship, setNodePosition]
+    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition, notation, model.aggregations]
   );
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: { id: string; position: { x: number; y: number } }) => {
-      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship);
+      handleNodeDragStop(node.id, node.position, updateEntity, updateRelationship, updateAggregation, aggregationIds);
       const kind = node.id.split('::')[0];
       if (kind === 'attr' || kind === 'relattr') {
         setNodePosition(node.id, node.position);
       }
+      syncChenAggregationPosition(node.id, node.position, notation, model.aggregations, updateRelationship, updateAggregation);
       // Select the dragged node
       const sel = handleNodeClick(node.id);
       setSelection(sel);
     },
-    [updateEntity, updateRelationship, setNodePosition, setSelection]
+    [updateEntity, updateRelationship, updateAggregation, aggregationIds, setNodePosition, setSelection, notation, model.aggregations]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(

@@ -1275,6 +1275,38 @@ describe('Aggregation CRUD', () => {
     expect(state().model.relationships).toHaveLength(0);
     expect(state().model.aggregations).toHaveLength(0);
   });
+
+  it('addAggregation computes initial position from participant averages', () => {
+    // e1 is at (0,0), e2 is at (1,1), so avg is (0.5, 0.5), + 150 y offset = (0.5, 150.5)
+    const aggId = state().addAggregation('AggR', relId);
+    const agg = state().model.aggregations.find((a) => a.id === aggId);
+    expect(agg).toBeDefined();
+    expect(agg!.position.x).toBeCloseTo(0.5);
+    expect(agg!.position.y).toBeCloseTo(150.5);
+  });
+
+  it('addAggregation uses provided position when given', () => {
+    const aggId = state().addAggregation('AggR', relId, { x: 500, y: 600 });
+    const agg = state().model.aggregations.find((a) => a.id === aggId);
+    expect(agg).toBeDefined();
+    expect(agg!.position).toEqual({ x: 500, y: 600 });
+  });
+
+  it('updateAggregation can update position', () => {
+    const aggId = state().addAggregation('AggR', relId);
+    state().updateAggregation(aggId, { position: { x: 999, y: 888 } });
+    const agg = state().model.aggregations.find((a) => a.id === aggId);
+    expect(agg).toBeDefined();
+    expect(agg!.position).toEqual({ x: 999, y: 888 });
+  });
+
+  it('updateAggregation position does not affect name', () => {
+    const aggId = state().addAggregation('AggR', relId);
+    state().updateAggregation(aggId, { position: { x: 100, y: 200 } });
+    const agg = state().model.aggregations.find((a) => a.id === aggId);
+    expect(agg!.name).toBe('AggR');
+    expect(agg!.position).toEqual({ x: 100, y: 200 });
+  });
 });
 
 // ============================================================

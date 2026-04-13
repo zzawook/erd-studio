@@ -413,7 +413,7 @@ describe('CrowsFootRenderer', () => {
           ],
         }),
       ],
-      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1' }],
+      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1', position: { x: 150, y: 150 } }],
     };
 
     const { nodes } = crowsFootRenderer.render(model);
@@ -429,7 +429,7 @@ describe('CrowsFootRenderer', () => {
     expect(aggNode?.data?.entity.isWeak).toBe(false);
   });
 
-  it('positions aggregation node based on participant average positions', () => {
+  it('positions aggregation node using its persisted position', () => {
     const model: ERDModel = {
       entities: [
         makeEntity({ id: 'e1', name: 'Student', position: { x: 100, y: 50 } }),
@@ -446,21 +446,49 @@ describe('CrowsFootRenderer', () => {
           ],
         }),
       ],
-      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1' }],
+      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1', position: { x: 200, y: 200 } }],
     };
 
     const { nodes } = crowsFootRenderer.render(model);
     const aggNode = nodes.find((n) => n.id === 'entity::agg1');
     expect(aggNode).toBeDefined();
-    // avgX = (100 + 300) / 2 = 200, avgY = (50 + 50) / 2 + 150 = 200
+    // Position should come directly from the aggregation's persisted position
     expect(aggNode?.position).toEqual({ x: 200, y: 200 });
+  });
+
+  it('aggregation node position is independent of connected entity positions', () => {
+    // The aggregation position should NOT be recalculated from entities
+    const model: ERDModel = {
+      entities: [
+        makeEntity({ id: 'e1', name: 'Student', position: { x: 0, y: 0 } }),
+        makeEntity({ id: 'e2', name: 'Course', position: { x: 1000, y: 1000 } }),
+      ],
+      relationships: [
+        makeRelationship({
+          id: 'r1',
+          name: 'Enrolls',
+          position: { x: 500, y: 500 },
+          participants: [
+            { entityId: 'e1', cardinality: { min: 0, max: '*' } },
+            { entityId: 'e2', cardinality: { min: 0, max: '*' } },
+          ],
+        }),
+      ],
+      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1', position: { x: 42, y: 99 } }],
+    };
+
+    const { nodes } = crowsFootRenderer.render(model);
+    const aggNode = nodes.find((n) => n.id === 'entity::agg1');
+    expect(aggNode).toBeDefined();
+    // Position should be exactly what was set, NOT computed from entities
+    expect(aggNode?.position).toEqual({ x: 42, y: 99 });
   });
 
   it('does not crash when aggregation references non-existent relationship', () => {
     const model: ERDModel = {
       entities: [],
       relationships: [],
-      aggregations: [{ id: 'agg1', name: 'Ghost', relationshipId: 'nonexistent' }],
+      aggregations: [{ id: 'agg1', name: 'Ghost', relationshipId: 'nonexistent', position: { x: 0, y: 0 } }],
     };
 
     // Should not crash
@@ -718,9 +746,9 @@ describe('CrowsFootRenderer', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Aggregation node with no valid participant positions (fallback position)
+  // Aggregation node uses its persisted position even with missing participants
   // -----------------------------------------------------------------------
-  it('uses fallback position for aggregation when no participants have positions', () => {
+  it('uses persisted position for aggregation even when participants are missing', () => {
     const model: ERDModel = {
       entities: [],
       relationships: [
@@ -733,13 +761,13 @@ describe('CrowsFootRenderer', () => {
           ],
         }),
       ],
-      aggregations: [{ id: 'agg1', name: 'Agg', relationshipId: 'r1' }],
+      aggregations: [{ id: 'agg1', name: 'Agg', relationshipId: 'r1', position: { x: 300, y: 300 } }],
     };
 
     const { nodes } = crowsFootRenderer.render(model);
     const aggNode = nodes.find((n) => n.id === 'entity::agg1');
     expect(aggNode).toBeDefined();
-    // Fallback position should be (300, 300)
+    // Position comes directly from the aggregation's persisted position
     expect(aggNode?.position).toEqual({ x: 300, y: 300 });
   });
 
@@ -845,7 +873,7 @@ describe('CrowsFootRenderer', () => {
           ],
         }),
       ],
-      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1' }],
+      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1', position: { x: 150, y: 150 } }],
     };
 
     const { edges } = crowsFootRenderer.render(model);
@@ -883,7 +911,7 @@ describe('CrowsFootRenderer', () => {
           ],
         }),
       ],
-      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1' }],
+      aggregations: [{ id: 'agg1', name: 'Enrollment', relationshipId: 'r1', position: { x: 150, y: 150 } }],
     };
 
     const { edges } = crowsFootRenderer.render(model);

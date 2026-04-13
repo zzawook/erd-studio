@@ -46,8 +46,8 @@ export interface ERDState {
   deleteRelationship: (id: string) => void;
 
   // Aggregation actions
-  addAggregation: (name: string, relationshipId: string) => string;
-  updateAggregation: (id: string, patch: Partial<Pick<Aggregation, 'name'>>) => void;
+  addAggregation: (name: string, relationshipId: string, position?: { x: number; y: number }) => string;
+  updateAggregation: (id: string, patch: Partial<Pick<Aggregation, 'name' | 'position'>>) => void;
   deleteAggregation: (id: string) => void;
 
   // Node position tracking (for attributes etc.)
@@ -433,9 +433,26 @@ export const useERDStore = create<ERDState>((set, get) => ({
 
   // ---- Aggregation actions ----
 
-  addAggregation: (name, relationshipId) => {
+  addAggregation: (name, relationshipId, position?) => {
     const id = generateId();
-    const aggregation: Aggregation = { id, name, relationshipId };
+    let aggPosition = position ?? { x: 300, y: 300 };
+    if (!position) {
+      // Compute a reasonable initial position from the relationship's participants
+      const currentState = get();
+      const rel = currentState.model.relationships.find((r) => r.id === relationshipId);
+      if (rel) {
+        const participantPositions = rel.participants
+          .filter((p) => !p.isAggregation)
+          .map((p) => currentState.model.entities.find((e) => e.id === p.entityId)?.position)
+          .filter((pos): pos is { x: number; y: number } => pos != null);
+        if (participantPositions.length > 0) {
+          const avgX = participantPositions.reduce((s, p) => s + p.x, 0) / participantPositions.length;
+          const avgY = participantPositions.reduce((s, p) => s + p.y, 0) / participantPositions.length + 150;
+          aggPosition = { x: avgX, y: avgY };
+        }
+      }
+    }
+    const aggregation: Aggregation = { id, name, relationshipId, position: aggPosition };
     set((state) => ({
       model: {
         ...state.model,

@@ -2227,7 +2227,7 @@ describe('PostgreSQLExporter', () => {
         },
       ],
       aggregations: [
-        { id: 'agg1', name: 'AggR', relationshipId: 'r1' },
+        { id: 'agg1', name: 'AggR', relationshipId: 'r1', position: { x: 0, y: 0 } },
       ],
     };
     const result = exporter.export(model);
@@ -4094,7 +4094,7 @@ describe('BaseExporter.resolveParticipantEntities', () => {
           isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
         },
       ],
-      aggregations: [{ id: 'agg1', name: 'EnrollAgg', relationshipId: 'r1' }],
+      aggregations: [{ id: 'agg1', name: 'EnrollAgg', relationshipId: 'r1', position: { x: 0, y: 0 } }],
     };
     const result = testExporter.testResolveParticipantEntities(
       { entityId: 'agg1', cardinality: { min: 0, max: '*' }, isAggregation: true },
@@ -4121,7 +4121,7 @@ describe('BaseExporter.resolveParticipantEntities', () => {
     const model: ERDModel = {
       entities: [],
       relationships: [],
-      aggregations: [{ id: 'agg1', name: 'Agg', relationshipId: 'missing_rel' }],
+      aggregations: [{ id: 'agg1', name: 'Agg', relationshipId: 'missing_rel', position: { x: 0, y: 0 } }],
     };
     const result = testExporter.testResolveParticipantEntities(
       { entityId: 'agg1', cardinality: { min: 0, max: '*' }, isAggregation: true },
@@ -4146,7 +4146,7 @@ describe('BaseExporter.resolveParticipantEntities', () => {
           isIdentifying: false, attributes: [], position: { x: 0, y: 0 },
         },
       ],
-      aggregations: [{ id: 'agg1', name: 'Agg', relationshipId: 'r1' }],
+      aggregations: [{ id: 'agg1', name: 'Agg', relationshipId: 'r1', position: { x: 0, y: 0 } }],
     };
     const result = testExporter.testResolveParticipantEntities(
       { entityId: 'agg1', cardinality: { min: 0, max: '*' }, isAggregation: true },
